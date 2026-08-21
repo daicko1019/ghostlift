@@ -1,0 +1,82 @@
+# Simulation Configuration
+
+# Simulation Parameters
+simulation:
+  duration: 10  # Number of simulation steps
+  half_space_size: 25  # Half of grid size (agents can move in range -25 to +25)
+  half_place_size: 5   # Half of place size (place covers -5 to +5)
+  
+# Agent Parameters
+agents:
+  num_agents: 5
+  communication_radius: 5  # Radius for agent communication
+  memory_limit: 20  # Maximum number of memory entries to store
+  memory_size: 5  # Number of recent memory entries used in LLM prompt
+  message_history_limit: 10  # Maximum number of received messages to store
+  message_context_size: 3  # Number of recent messages used in LLM prompt
+  
+# Place Parameters (multiple places)
+# Each place must have a type: "cafe", "library", etc.
+# type is a required field
+places:
+  - name: "cafe"
+    type: "cafe"  # Place type: cafe, library, etc. (required)
+    center_x: -15  # Left side of field
+    center_y: 0
+    half_size: 5  # covers -5 to +5 from center
+    capacity: 12  # Maximum comfortable capacity of this place
+  - name: "library"
+    type: "library"  # Place type: cafe, library, etc. (required)
+    center_x: 15  # Right side of field
+    center_y: 0
+    half_size: 5  # covers -5 to +5 from center
+    capacity: 10  # Maximum comfortable capacity of this place
+  
+# LLM Parameters
+llm:
+  # Default: a lightweight model that runs on most machines (good for a first run)
+  model: "qwen3:4b-instruct-2507-q4_K_M"  # Ollama model name
+  # For higher-quality emergent behavior (needs more RAM/VRAM), try a larger model, e.g.:
+  #model: "gpt-oss:20b"
+  #model: "qwen3:latest"
+  base_url: "http://localhost:11434"  # Ollama API endpoint
+  temperature: 0.2
+  # Thinking models emit reasoning that this project discards, yet it still
+  # consumes the max_tokens budget - leave it off so the budget goes to the
+  # JSON answer. Harmless for instruct-only models; omit the key to leave a
+  # model's own default alone.
+  think: false
+  max_tokens: 512  # Enough for the JSON answer once thinking is off
+  timeout: 300  # Read timeout for one LLM call [s]
+  # Anti-repetition parameters
+  repeat_penalty: 1.1  # Repeat penalty (1.0-1.2 range, adjust for fine-tuning)
+  repeat_last_n: 128  # Range to check for repetition (longer = stronger against loops)
+  min_p: 0.05  # Min-P (cuts noise while preserving intelligence)
+  
+# Fire Event Parameters (multiple fires supported)
+# Each fire can specify center_x/center_y for fixed position, or omit for random position
+fires:
+  - name: "fire1"
+    start_step: 3
+    intensity: 0.8
+    radius: 15
+    center_x: 15         # Fire position X (omit for random)
+    center_y: 10         # Fire position Y (omit for random)
+  - name: "fire2"
+    start_step: 5
+    intensity: 0.5
+    radius: 8
+    center_x: -10
+    center_y: -10
+
+# Visualization Parameters
+visualization:
+  save_frames: true
+  frame_interval: 1  # Save frame every N steps
+  output_dir: "output"
+  
+# Logging
+logging:
+  level: "INFO"
+  log_file: "simulation.log"
+

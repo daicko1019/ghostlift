@@ -1,0 +1,42 @@
+# Python virtual environments (any naming pattern)
+venv*/
+.env*/
+env*/
+*_env/
+*env/
+*~
+
+# Byte-compiled / cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment variables
+.env
+*.env
+
+# Logs and database
+*.log
+*.sqlite3
+
+# Jupyter and testing
+.ipynb_checkpoints/
+.pytest_cache/
+.hypothesis/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# IDE / Editor settings
+.vscode/
+.idea/
+
+# System-specific files
+.DS_Store
+*/.DS_Store
+Thumbs.db
+
+# specific folder
+output/
