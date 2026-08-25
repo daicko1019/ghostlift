@@ -527,7 +527,7 @@ When publishing work that uses this code, please refer to the following.
 
 > Ryuki Hyodo. *Minimal Local Simulation Foundations for LLM- and VLM-Driven Agents in 2D and 3D Environments*.
 
-The venue and identifiers (DOI and so on) will be added once published.
+https://doi.org/10.48550/arXiv.2608.22833
 
 For the 3D, VLM-driven version, see [SD-AgentFoundry-3D](https://github.com/ryukih/SD-AgentFoundry-3D).
 
