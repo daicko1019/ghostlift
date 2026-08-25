@@ -525,7 +525,7 @@ python viewer/generate_video.py output/ --dpi 200
 
 > Ryuki Hyodo. *Minimal Local Simulation Foundations for LLM- and VLM-Driven Agents in 2D and 3D Environments*.
 
-掲載先・識別子（DOI等）は公開後に追記します。
+http://arxiv.org/abs/2608.22833 (doi.org/10.48550/arXiv.2608.22833)
 
 3次元・VLM 版は [SD-AgentFoundry-3D](https://github.com/ryukih/SD-AgentFoundry-3D) を参照してください。
 
