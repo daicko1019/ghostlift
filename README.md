@@ -68,21 +68,29 @@ python3 -m venv venv && source venv/bin/activate && pip install -r requirements.
 ollama pull qwen3:4b-instruct-2507-q4_K_M
 ```
 
-3つのシナリオを順に実行します（1本あたり LLM 呼び出し256回）:
+3つのシナリオを実行します（1本あたり LLM 呼び出し256回）:
 
 ```bash
-./scripts/run_all.sh
+python scripts/run_all.py
 ```
 
-3本を同時に走らせて待ち時間を縮めることもできます。Ollama が並列リクエストを
-1つのGPUバッチにまとめるため、3倍かかるわけではありません:
+3本を同時に走らせて待ち時間を縮められます。Ollama が並列リクエストを1つのGPUバッチに
+まとめるため、3倍かかるわけではありません:
 
 ```bash
-# サーバを並列受付で起動しておく
+# サーバを並列受付で起動しておく（Windows は set OLLAMA_NUM_PARALLEL=3）
 OLLAMA_NUM_PARALLEL=3 OLLAMA_KEEP_ALIVE=4h ollama serve
 
 # 別ターミナルで
-./scripts/run_parallel.sh
+python scripts/run_all.py --parallel 3
+```
+
+**LLMシミュレーションの1回の実行は逸話にすぎません。** シードを変えた複数試行を回して
+分布で語るのが本筋です。GPUがあるなら:
+
+```bash
+python scripts/run_all.py --seeds 42 43 44 --parallel 3
+python scripts/aggregate_trials.py 42 43 44
 ```
 
 実行が終わったら、2つの世界を並べて再生できます:
