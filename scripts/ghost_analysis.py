@@ -168,7 +168,8 @@ def plot(summaries: List[Dict], control_dir: str, out_path: str) -> None:
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 5.2))
 
     # Left: the decomposition, one stacked bar per campaign
-    labels = [s["treated_dir"].replace("output_", "") for s in summaries]
+    labels = [os.path.basename(s["treated_dir"].rstrip("/")).replace("output_", "")
+              for s in summaries]
     new = [len(s["buckets"]["new"]) for s in summaries]
     stolen = [len(s["buckets"]["stolen"]) for s in summaries]
     ghost = [len(s["buckets"]["ghost"]) for s in summaries]
@@ -183,15 +184,20 @@ def plot(summaries: List[Dict], control_dir: str, out_path: str) -> None:
     ax1.axhline(0, color="black", linewidth=0.8)
 
     for i, s in enumerate(summaries):
-        ax1.text(i, s["attributed_cv"] + 0.12,
-                 f"platform reports {s['attributed_cv']}",
-                 ha="center", fontsize=9)
+        ax1.text(i, s["attributed_cv"] + 0.14,
+                 f"platform reports {s['attributed_cv']}\nreally gained {s['incremental_brand']}",
+                 ha="center", va="bottom", fontsize=9)
+
+    # Headroom for the annotations and the legend, which otherwise sit on the bars
+    top = max([s["attributed_cv"] for s in summaries] + [1])
+    bottom = min(lost + [0])
+    ax1.set_ylim(bottom - 0.6, top + 1.9)
 
     ax1.set_xticks(list(x))
     ax1.set_xticklabels(labels)
     ax1.set_ylabel("agents")
     ax1.set_title("What the reported conversions were actually made of")
-    ax1.legend(fontsize=8, loc="upper left")
+    ax1.legend(fontsize=8, loc="lower left", framealpha=0.95)
     ax1.grid(axis="y", alpha=0.3)
 
     # Right: cumulative brand sales over time, treated runs against the control
@@ -208,11 +214,13 @@ def plot(summaries: List[Dict], control_dir: str, out_path: str) -> None:
     for s in summaries:
         curve = brand_curve(s["treated_dir"], brand)
         ax2.plot(range(1, len(curve) + 1), curve,
-                 label=s["treated_dir"].replace("output_", ""), linewidth=2)
+                 label=os.path.basename(s["treated_dir"].rstrip("/")).replace("output_", ""),
+                 linewidth=2)
 
     ax2.set_xlabel("step")
     ax2.set_ylabel(f"cumulative {brand} sales")
-    ax2.set_title(f"{brand} sales: every run is the same 8 people")
+    n_agents = len(load_series(control_dir)[0]["agents"])
+    ax2.set_title(f"{brand} sales: every run is the same {n_agents} people")
     ax2.legend(fontsize=9)
     ax2.grid(alpha=0.3)
 
