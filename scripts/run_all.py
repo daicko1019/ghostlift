@@ -65,18 +65,19 @@ def config_for(scenario: str, seed: int = None) -> tuple:
 
 
 def run_one(job: tuple) -> tuple:
-    scenario, seed = job
+    scenario, seed, llm_url = job
     config, out_dir = config_for(scenario, seed)
     label = scenario if seed is None else f"{scenario}(seed {seed})"
     log_name = f"run_{scenario}.out" if seed is None else f"run_{scenario}_s{seed}.out"
     log_path = os.path.join(REPO, log_name)
 
-    print(f"  start  {label}")
+    cmd = [venv_python(), os.path.join(REPO, "src", "main.py"), "--config", config]
+    if llm_url:
+        cmd += ["--llm-url", llm_url]
+
+    print(f"  start  {label}" + (f"  -> {llm_url}" if llm_url else ""))
     with open(log_path, "w", encoding="utf-8") as log:
-        proc = subprocess.run(
-            [venv_python(), os.path.join(REPO, "src", "main.py"), "--config", config],
-            cwd=REPO, stdout=log, stderr=subprocess.STDOUT,
-        )
+        proc = subprocess.run(cmd, cwd=REPO, stdout=log, stderr=subprocess.STDOUT)
 
     # Only the generated copies are ours to delete
     if seed is not None and os.path.exists(config):
@@ -106,12 +107,27 @@ def main() -> None:
     parser.add_argument("--parallel", type=int, default=1,
                         help="how many runs to overlap (match OLLAMA_NUM_PARALLEL)")
     parser.add_argument("--scenarios", nargs="+", default=SCENARIOS)
+    parser.add_argument("--llm-urls", nargs="+", default=None,
+                        help="one or more Ollama endpoints; runs are dealt out "
+                             "across them round-robin, so several GPUs can share "
+                             "the work (e.g. http://gpu1:11434 http://gpu2:11434)")
     args = parser.parse_args()
 
     seeds = args.seeds if args.seeds else [None]
-    jobs = [(s, seed) for seed in seeds for s in args.scenarios]
 
-    print(f"{len(jobs)} run(s), {args.parallel} at a time")
+    # A seed's scenarios are twins: they must produce identical LLM output for
+    # identical prompts, which is only safe on one and the same endpoint. Two
+    # GPUs can differ in the last bits of a float and that is enough to break
+    # the comparison. So endpoints are dealt out per seed, never per scenario.
+    urls = args.llm_urls or [None]
+    jobs = [
+        (s, seed, urls[i % len(urls)])
+        for i, seed in enumerate(seeds)
+        for s in args.scenarios
+    ]
+
+    print(f"{len(jobs)} run(s), {args.parallel} at a time"
+          + (f", across {len(urls)} endpoint(s)" if args.llm_urls else ""))
     results = []
     if args.parallel > 1:
         with concurrent.futures.ThreadPoolExecutor(max_workers=args.parallel) as pool:

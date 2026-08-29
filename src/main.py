@@ -135,6 +135,14 @@ def parse_arguments() -> argparse.Namespace:
         default=None,
         help='Interval between visualization frames (overrides config)'
     )
+    parser.add_argument(
+        '--llm-url',
+        type=str,
+        default=None,
+        help='Ollama base URL, overriding llm.base_url in the config. Lets a run '
+             'be pointed at a machine with a GPU without editing the scenario file '
+             '(e.g. http://100.78.189.115:11434 over a private network)'
+    )
 
     return parser.parse_args()
 
@@ -189,8 +197,14 @@ def main():
     args = parse_arguments()
     config = load_config(args.config)
 
+    if args.llm_url:
+        config['llm']['base_url'] = args.llm_url
+
     setup_logging(config)
     logger = logging.getLogger(__name__)
+
+    if args.llm_url:
+        logger.info(f"LLM endpoint overridden: {args.llm_url}")
 
     should_save, frame_interval, output_dir = determine_visualization_settings(args, config)
     prepare_output_directory(output_dir, should_save, logger)
