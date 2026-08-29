@@ -78,8 +78,8 @@ python scripts/run_all.py
 まとめるため、3倍かかるわけではありません:
 
 ```bash
-# サーバを並列受付で起動しておく（Windows は set OLLAMA_NUM_PARALLEL=3）
-OLLAMA_NUM_PARALLEL=3 OLLAMA_KEEP_ALIVE=4h ollama serve
+# サーバは必ず単一スロットで起動する（下記の警告を参照）
+OLLAMA_NUM_PARALLEL=1 OLLAMA_KEEP_ALIVE=4h ollama serve
 
 # 別ターミナルで
 python scripts/run_all.py --parallel 3
@@ -93,27 +93,39 @@ python scripts/run_all.py --seeds 42 43 44 --parallel 3
 python scripts/aggregate_trials.py 42 43 44
 ```
 
+### ⚠️ 並列バッチ推論は再現性を壊す（重要）
+
+**Ollama は `OLLAMA_NUM_PARALLEL=1` で起動してください。** これは性能の話ではなく、
+この作品が成立するかどうかの話です。
+
+2以上にすると llama.cpp が複数リクエストを1バッチにまとめ、バッチの組まれ方によって
+浮動小数点の加算順序が変わります。シードを固定していても生成がずれ、
+**広告を出していないのに2つの世界が分岐します**。実際に我々はこれで一度失敗しました。
+
+単一スロットなら決定的であることは確認済みです:
+
+| 条件 | 結果 |
+|---|---|
+| 同一プロンプト×3（逐次） | 完全一致 |
+| 同一プロンプト×3（同時） | 完全一致 |
+| 別プロンプトを挟んだ後の再実行 | 完全一致（KVキャッシュの汚染なし） |
+
+スロットが1つでも、シナリオのプロセスは同時に起動して構いません。リクエストが
+キューイングされるだけで、GPUがボトルネックである以上、待ち時間は逐次と変わりません。
+
 ### 「本当に同じ世界なのか」を検証する
 
 この作品の主張は「広告が着弾するまで2つの世界は同一」という一点にかかっています。
-主張ではなく検証として置いてあります:
+主張のままにせず、検証スクリプトを同梱しています:
 
 ```bash
 python scripts/verify_twins.py output_noad output_broadcast --ad-step 4
 ```
 
-```
-  metrics.jsonl            identical  (3 records)
-  messages.jsonl           identical  (12 records)
-  memory_reasoning.jsonl   identical  (8 records)
-
-The two worlds are identical up to the campaign.
-Every later difference is attributable to the ad.
-```
-
-口コミの文面も、各エージェントの思考ログも、1文字違わず一致します。
-分岐が始まるのは広告が流れた step 4 からです。
-（乖離が出た場合は分解が成立しないので、スクリプトは非ゼロ終了します）
+metrics / messages / memory_reasoning を広告前のステップについて突き合わせ、
+口コミの文面も各エージェントの思考ログも1文字違わないことを確認します。
+乖離があれば分解が成立しないので、スクリプトは**非ゼロ終了します**。
+実行結果は下記「結果」の節に掲載しています。
 
 実行が終わったら、2つの世界を並べて再生できます:
 

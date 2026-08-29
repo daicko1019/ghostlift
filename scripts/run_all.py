@@ -11,10 +11,13 @@ do not. Two modes:
     # rather than a single number
     python scripts/run_all.py --seeds 42 43 44
 
-Runs can overlap with --parallel N. Ollama batches concurrent requests into one
-GPU batch, so N worlds cost far less than N times one world - but the server has
-to have been started with OLLAMA_NUM_PARALLEL>=N or the extra requests just
-queue up.
+Runs can overlap with --parallel N. Start the Ollama server with
+OLLAMA_NUM_PARALLEL=1 anyway: overlapping processes then simply queue on one
+slot, which costs nothing (the GPU is the bottleneck either way) and keeps
+generation reproducible. With more slots llama.cpp batches requests together,
+the order of floating point additions changes with the batch, and twin runs
+drift apart before the ad ever lands - which silently invalidates the whole
+comparison.
 """
 import argparse
 import concurrent.futures
