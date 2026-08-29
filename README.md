@@ -93,6 +93,28 @@ python scripts/run_all.py --seeds 42 43 44 --parallel 3
 python scripts/aggregate_trials.py 42 43 44
 ```
 
+### 「本当に同じ世界なのか」を検証する
+
+この作品の主張は「広告が着弾するまで2つの世界は同一」という一点にかかっています。
+主張ではなく検証として置いてあります:
+
+```bash
+python scripts/verify_twins.py output_noad output_broadcast --ad-step 4
+```
+
+```
+  metrics.jsonl            identical  (3 records)
+  messages.jsonl           identical  (12 records)
+  memory_reasoning.jsonl   identical  (8 records)
+
+The two worlds are identical up to the campaign.
+Every later difference is attributable to the ad.
+```
+
+口コミの文面も、各エージェントの思考ログも、1文字違わず一致します。
+分岐が始まるのは広告が流れた step 4 からです。
+（乖離が出た場合は分解が成立しないので、スクリプトは非ゼロ終了します）
+
 実行が終わったら、2つの世界を並べて再生できます:
 
 ```bash
@@ -143,9 +165,10 @@ C が介入実験の本命です。実務のリターゲティングは「効率
 │   ├── ollama_client.py           # Ollama APIクライアント（seed対応を追加）
 │   └── visualization.py           # フレームPNG描画
 ├── scripts/
-│   ├── run_all.sh                 # 3シナリオを順に実行 → 分解まで
-│   ├── run_parallel.sh            # 3シナリオを同時に実行 → 分解まで
+│   ├── run_all.py                 # 実行〜分解まで（Windows/macOS/Linux共通、複数シード対応）
 │   ├── ghost_analysis.py          # ★ 反実仮想ペアの4分類と作図
+│   ├── verify_twins.py            # ★ 広告前の2世界が同一であることの検証
+│   ├── aggregate_trials.py        # 複数シード試行の集計
 │   └── serve.py                   # デモ用静的サーバー
 ├── demo/
 │   ├── dashboard.html             # 二画面リプレイ（単一HTML・依存なし）
@@ -171,6 +194,7 @@ C が介入実験の本命です。実務のリターゲティングは「効率
 | `buy` アクション | 店内かつ在庫あり・予算内のときだけ成立。耐久財として1人1回 | 買うかどうかを LLM の判断にすることで、「広告が説得したか」を初めて問える |
 | `metrics.jsonl` | 在庫・購買・広告配信・位置を毎ステップ記録 | 分解スクリプトとダッシュボードの入力 |
 | `scripts/ghost_analysis.py` | 2つの実行を個人単位で突き合わせ、NEW/STOLEN/GHOST/LOST に分解 | 本作品の主要成果物 |
+| `scripts/verify_twins.py` | 広告前の2世界がログレベルで同一であることを検証 | 「差分は広告に起因する」という主張を、主張のままにしないため |
 | `demo/dashboard.html` | 2つの世界を並べて再生 | 反実仮想そのものを絵にする。デモ動画もこれ1枚で作れる |
 
 ## 出典・ライセンス
