@@ -3,11 +3,13 @@
 
 The whole argument of this project rests on one claim: before the campaign
 starts, the advertised world and the counterfactual world are not merely
-similar, they are identical - same people, same positions, same words, same
-reasoning. Every difference after that step is therefore caused by the ad and
-nothing else.
+similar, they are the same world - same people, same positions, same messages,
+same memories. Every difference after that step is therefore caused by the ad
+and nothing else.
 
 That is a checkable claim, so this checks it rather than asserting it.
+
+What is compared is the world, not the prose. See LOG_ONLY_FIELDS below.
 
     python scripts/verify_twins.py output_noad output_broadcast --ad-step 4
 
@@ -23,6 +25,14 @@ from typing import Dict, List
 # Files whose contents must match step for step before the campaign begins
 TRACKED = ["metrics.jsonl", "messages.jsonl", "memory_reasoning.jsonl"]
 
+# Not every logged field is part of the world. Only two of the LLM's outputs are
+# ever read again: the message, which is delivered to nearby agents, and the
+# memory, which the agent carries into its own next prompt. "reasoning" is
+# written to the log and never looked at again, so two runs whose reasoning
+# differs but whose messages, memories and state match are the same world with
+# two different write-ups of it - which does not invalidate any comparison.
+LOG_ONLY_FIELDS = {"reasoning"}
+
 
 def load(output_dir: str, name: str) -> List[Dict]:
     path = os.path.join(output_dir, name)
@@ -34,6 +44,18 @@ def load(output_dir: str, name: str) -> List[Dict]:
 
 def before(records: List[Dict], step: int) -> List[Dict]:
     return [r for r in records if r.get("step", 0) < step]
+
+
+def strip_log_only(records: List[Dict]) -> List[Dict]:
+    return [{k: v for k, v in r.items() if k not in LOG_ONLY_FIELDS} for r in records]
+
+
+def log_only_differs(a: List[Dict], b: List[Dict]) -> bool:
+    return any(
+        x.get(k) != y.get(k)
+        for x, y in zip(a, b)
+        for k in LOG_ONLY_FIELDS
+    )
 
 
 def first_difference(a: List[Dict], b: List[Dict]) -> str:
@@ -81,8 +103,12 @@ def main() -> None:
             b = [{**r, "agents": [{**ag, "ads_seen": 0} for ag in r["agents"]]} for r in b]
             a = [{**r, "agents": [{**ag, "ads_seen": 0} for ag in r["agents"]]} for r in a]
 
+        prose_differs = log_only_differs(a, b)
+        a, b = strip_log_only(a), strip_log_only(b)
+
         if a == b:
-            print(f"  {name:<24} identical  ({len(a)} records)")
+            note = "  (reasoning text differs; not part of the world)" if prose_differs else ""
+            print(f"  {name:<24} identical  ({len(a)} records){note}")
         else:
             ok = False
             print(f"  {name:<24} DIVERGED")
@@ -96,8 +122,9 @@ def main() -> None:
 
     print("The two worlds diverged before the campaign, so the decomposition "
           "cannot attribute later differences to the ad alone.")
-    print("Usual causes: the seed is not set in one of the configs, the two "
-          "runs used different models, or the Ollama server ignored the seed.")
+    print("Usual causes: the model was cold when one of the runs started (warm it "
+          "first - scripts/run_all.py does), the seed is not set in one of the "
+          "configs, or the two runs used different models.")
     sys.exit(1)
 
 

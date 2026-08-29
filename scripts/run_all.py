@@ -11,16 +11,14 @@ do not. Two modes:
     # rather than a single number
     python scripts/run_all.py --seeds 42 43 44
 
-Runs can overlap with --parallel N. Start the Ollama server with
-OLLAMA_NUM_PARALLEL=1 anyway: overlapping processes then simply queue on one
-slot, which costs nothing (the GPU is the bottleneck either way) and keeps
-generation reproducible. With more slots llama.cpp batches requests together,
-the order of floating point additions changes with the batch, and twin runs
-drift apart before the ad ever lands - which silently invalidates the whole
-comparison.
+Runs can overlap with --parallel N. Whatever N is, the model is warmed up
+first: a run that triggers the model load generates different messages and
+memories from one that finds it resident, and those feed back into the world,
+so twin runs started cold drift apart before the ad ever lands.
 """
 import argparse
 import concurrent.futures
+import json
 import os
 import re
 import subprocess
@@ -29,6 +27,44 @@ import tempfile
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCENARIOS = ["noad", "broadcast", "retarget"]
+
+
+def warm_up(url: str = None) -> None:
+    """Load the model before any run starts.
+
+    A run that triggers the model load sees different generation from one that
+    finds it already resident - not in the actions taken, but in the messages
+    and memories the agents produce, which do feed back into the world. Twin
+    runs must therefore all start warm, so one throwaway request is made first.
+    """
+    import urllib.request
+
+    base = (url or "http://localhost:11434").rstrip("/")
+    model = None
+    for name in SCENARIOS:
+        path = os.path.join(REPO, f"scenario_{name}.yaml")
+        if os.path.exists(path):
+            with open(path, encoding="utf-8") as f:
+                for line in f:
+                    if line.strip().startswith("model:"):
+                        model = line.split(":", 1)[1].strip().strip('"\'')
+                        break
+        if model:
+            break
+    if not model:
+        return
+
+    body = json.dumps({"model": model, "prompt": "warm up", "stream": False,
+                       "options": {"num_predict": 1, "seed": 42}}).encode()
+    req = urllib.request.Request(f"{base}/api/generate", data=body,
+                                 headers={"Content-Type": "application/json"})
+    print(f"  warming {model} on {base} ...", end="", flush=True)
+    try:
+        with urllib.request.urlopen(req, timeout=600):
+            pass
+        print(" ready")
+    except Exception as e:
+        print(f" failed ({e}); runs may not be comparable")
 
 
 def venv_python() -> str:
@@ -128,6 +164,9 @@ def main() -> None:
         for i, seed in enumerate(seeds)
         for s in args.scenarios
     ]
+
+    for url in urls:
+        warm_up(url)
 
     print(f"{len(jobs)} run(s), {args.parallel} at a time"
           + (f", across {len(urls)} endpoint(s)" if args.llm_urls else ""))
