@@ -16,6 +16,7 @@ DEFAULT_MAX_TOKENS = 200
 DEFAULT_REPEAT_PENALTY = 1.1
 DEFAULT_REPEAT_LAST_N = 128
 DEFAULT_MIN_P = 0.05
+DEFAULT_SEED = None  # None = sampler stays random, as upstream
 DEFAULT_THINK = None  # None = leave the model's own thinking default untouched
 DEFAULT_TIMEOUT_SECONDS = 60  # Read timeout for one /api/generate call [s]
 CONNECTION_CHECK_TIMEOUT = 5
@@ -33,6 +34,7 @@ class OllamaClient:
         repeat_penalty: float = DEFAULT_REPEAT_PENALTY,
         repeat_last_n: int = DEFAULT_REPEAT_LAST_N,
         min_p: float = DEFAULT_MIN_P,
+        seed: Optional[int] = DEFAULT_SEED,
         think: Optional[bool] = DEFAULT_THINK,
         timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
     ):
@@ -43,6 +45,7 @@ class OllamaClient:
         self.repeat_penalty = repeat_penalty
         self.repeat_last_n = repeat_last_n
         self.min_p = min_p
+        self.seed = seed
         self.think = think
         self.timeout_seconds = timeout_seconds
         self.api_url = f"{self.base_url}/api/generate"
@@ -66,6 +69,12 @@ class OllamaClient:
                 "min_p": self.min_p
             }
         }
+
+        # Counterfactual twin runs are only comparable if the sampler replays
+        # identically, so the seed is pinned per call rather than left to the
+        # server. Omitted when unset so upstream behaviour is unchanged.
+        if self.seed is not None:
+            payload["options"]["seed"] = self.seed
 
         # Thinking models (qwen3, gpt-oss, ...) return their reasoning in a
         # separate "thinking" field that this client never reads, yet those

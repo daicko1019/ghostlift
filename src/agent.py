@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 # Constants
 FALLBACK_REASONING_LENGTH = 100
 MAX_MESSAGE_WORDS = 200
+AD_CONTEXT_SIZE = 3  # Most recent ad impressions shown in the prompt
 
 # Direction mappings (4 cardinal directions only)
 # Coordinate system: X increases from left to right, Y increases from bottom to top
@@ -32,7 +33,7 @@ class MessageDecision(TypedDict):
 
 class ActionDecision(TypedDict):
     """Type definition for agent action decision"""
-    action: str  # "move" or "stay"
+    action: str  # "move", "stay" or "buy"
     direction: Optional[str]  # Direction to move (None if action is "stay")
     memory: str  # What the agent wants to remember for the next step
     reasoning: str  # Explanation of the decision
@@ -51,6 +52,7 @@ class Agent:
         places: List[PlaceConfig],
         num_agents: int,
         gender: str = "male",
+        budget: int = 0,
         memory_limit: int = 20,
         memory_size: int = 5,
         message_history_limit: int = 10,
@@ -64,6 +66,7 @@ class Agent:
         self.places = places
         self.num_agents = num_agents
         self.gender = gender
+        self.budget = budget  # Numeric only; whether it is "enough" is the LLM's call
 
         # Memory parameters
         self.memory_limit = memory_limit  # Maximum memories to store
@@ -76,6 +79,9 @@ class Agent:
         self.current_place: Optional[str] = None  # Name of the place the agent is in (None if outside)
         self.memory: List[str] = []  # Store past decisions and observations
         self.received_messages: List[Dict] = []  # Messages from other agents
+        self.purchased_at: Optional[int] = None  # Step of this agent's purchase (None = has not bought)
+        self.purchase_place: Optional[str] = None  # Where it bought
+        self.ads_seen: List[Dict] = []  # Ad impressions delivered to this agent
 
 
     def is_in_place(self, position: Tuple[int, int]) -> bool:
@@ -188,6 +194,48 @@ class Agent:
             )
         return "\n".join(lines) + "\n"
 
+    def _build_stock_section(self, place_status: Optional[Dict]) -> str:
+        """Stock and price of the place the agent is standing in.
+
+        Follows the upstream rule for place information: numbers only, and only
+        for agents who are actually inside. Someone outside the store cannot see
+        how many are left, exactly as with occupancy.
+        """
+        if not place_status or place_status.get('stock') is None:
+            return ""
+        return (
+            f"\n  Units left in stock here: {place_status['stock']}"
+            f"\n  Price per unit: {place_status.get('price')}"
+        )
+
+    def _build_ad_section(self) -> str:
+        """Ad impressions this agent has received so far.
+
+        The counterpart of the upstream fire event on the information axis: a
+        fire is perceived by distance, an ad is delivered by targeting. The copy
+        is passed through verbatim - how persuasive it is, is the LLM's call.
+        """
+        if not self.ads_seen:
+            return ""
+
+        lines = ["\n=== ADS YOU HAVE SEEN ==="]
+        for ad in self.ads_seen[-AD_CONTEXT_SIZE:]:
+            lines.append(
+                f"[step {ad['step']}] sponsored by {ad['sponsor']}: \"{ad['copy']}\""
+            )
+        return "\n".join(lines) + "\n"
+
+    def _build_wallet_section(self) -> str:
+        """Budget and whether this agent has already bought."""
+        if self.purchased_at is not None:
+            bought = f"Yes, at step {self.purchased_at} in {self.purchase_place}"
+        else:
+            bought = "No"
+        return (
+            f"Budget you can spend: {self.budget}\n"
+            f"Already bought the item: {bought}"
+        )
+
     def _limit_message_words(self, message: str) -> str:
         """Check message word count and warn if exceeds MAX_MESSAGE_WORDS"""
         if not message:
@@ -235,6 +283,7 @@ class Agent:
                 f"\n  Number of agents here: {agents_in_place}"
                 f"\n  Capacity: {capacity}"
                 f"\n  Occupancy rate: {occupancy_rate:.2f}"
+                + self._build_stock_section(place_status)
             )
         else:
             # Agents outside places do NOT receive place status
@@ -246,15 +295,18 @@ class Agent:
         world_description = f"a 2D world with multiple places ({', '.join(unique_types)})"
 
         fire_section = self._build_fire_section(fire_info)
+        ad_section = self._build_ad_section()
+        wallet_text = self._build_wallet_section()
 
         prompt = f"""You are Agent {self.id} ({self.gender}) in {world_description}.
 
 === YOUR CURRENT STATE ===
 Gender: {self.gender}
+{wallet_text}
 In place: {"Yes" if self.in_place else "No"}
 {"Current place: " + self.current_place if self.in_place else ""}
 {place_section_text}
-{fire_section}
+{fire_section}{ad_section}
 === NEARBY AGENTS (you can communicate with these agents) ===
 {nearby_text}
 
@@ -311,6 +363,7 @@ Step: {step}
                 f"\n  Number of agents here: {agents_in_place}"
                 f"\n  Capacity: {capacity}"
                 f"\n  Occupancy rate: {occupancy_rate:.2f}"
+                + self._build_stock_section(place_status)
             )
         else:
             # Agents outside places do NOT receive place status
@@ -339,16 +392,19 @@ Step: {step}
             message_section = f"\n=== MESSAGE YOU DECIDED TO SEND ===\n{message_to_send}\n"
 
         fire_section = self._build_fire_section(fire_info)
+        ad_section = self._build_ad_section()
+        wallet_text = self._build_wallet_section()
 
         prompt = f"""You are Agent {self.id} ({self.gender}) in {world_description}.
 
 === YOUR CURRENT STATE ===
 Gender: {self.gender}
+{wallet_text}
 Position: ({self.position[0]}, {self.position[1]})
 In place: {"Yes" if self.in_place else "No"}
 {"Current place: " + self.current_place if self.in_place else ""}
 {place_section_text}
-{fire_section}
+{fire_section}{ad_section}
 === PLACE LOCATIONS ===
 {place_locations_text}
 
@@ -363,12 +419,14 @@ In place: {"Yes" if self.in_place else "No"}
 {message_section}=== AVAILABLE ACTIONS ===
 - "stay": remain at current position
 - "move" with direction: "up" (Y+1), "down" (Y-1), "left" (X-1), "right" (X+1)
+- "buy": buy one unit of the item. Only possible while you are inside a place
+  that has stock left and whose price is within your budget. Ignored otherwise.
 
 Field boundaries: X and Y from -{self.half_space_size} to +{self.half_space_size}
 
 === RESPOND IN JSON ===
 {{
-    "action": "move" or "stay",
+    "action": "move", "stay" or "buy",
     "direction": "up", "down", "left", or "right" (only if action is "move"),
     "memory": "what you want to remember for the next step (your thoughts, observations, intentions)",
     "reasoning": "brief explanation of your decision"
@@ -482,7 +540,9 @@ Step: {step}
         memory = ""
         reasoning = response[:FALLBACK_REASONING_LENGTH]
 
-        if "move" in response.lower():
+        if "buy" in response.lower():
+            action = "buy"
+        elif "move" in response.lower():
             action = "move"
             direction = self._extract_direction_from_text(response)
 

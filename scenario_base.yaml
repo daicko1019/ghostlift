@@ -1,0 +1,11 @@
+# GhostLift - shared world definition
+#
+# All three scenarios below are this same world. The ONLY difference between
+# them is the `ad_campaigns:` block, so any difference in the results is
+# attributable to the advertising and nothing else.
+#
+# This file is not run directly; it documents what the three scenario files
+# have in common. Run one of:
+#   scenario_noad.yaml       (A: counterfactual, no advertising at all)
+#   scenario_broadcast.yaml  (B: untargeted broadcast to everyone)
+#   scenario_retarget.yaml   (C: retargeting - only people already near the store)

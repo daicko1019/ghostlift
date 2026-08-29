@@ -30,6 +30,14 @@ class Simulation:
 
         # Output directory for logs
         self.output_dir = output_dir
+
+        # Counterfactual twin runs must start from the same world, so the seed
+        # covers initial positions, personas and budgets. Upstream leaves this
+        # unset and is deliberately irreproducible; omitting it keeps that.
+        self.seed = self.config.get('seed')
+        if self.seed is not None:
+            random.seed(self.seed)
+            logger.info(f"Random seed fixed: {self.seed}")
         
         # Simulation parameters
         sim_config = self.config['simulation']
@@ -94,6 +102,28 @@ class Simulation:
             )
         self.fire_states: List[Dict] = []  # Active fires
 
+        # Stock is per-run mutable state; the config value is only its start
+        self.stock: Dict[str, Optional[int]] = {
+            p['name']: p.get('stock') for p in self.places
+        }
+        self.purchases: List[Dict] = []  # {step, agent_id, place, price}
+
+        # Ad campaigns: the information-axis counterpart of a fire. A fire is
+        # perceived by distance; an ad is delivered by targeting.
+        self.ad_configs: List[Dict] = self.config.get('ad_campaigns', [])
+        self.impressions = 0  # Cumulative ad impressions (the thing you pay for)
+        self.ads_delivered_this_step: List[Dict] = []
+        for ac in self.ad_configs:
+            logger.info(
+                f"Ad campaign '{ac.get('name')}' configured: "
+                f"steps {ac['start_step']}-{ac.get('end_step', ac['start_step'])}, "
+                f"targeting={ac.get('targeting', 'all')}"
+            )
+
+        # Budgets are handed out from the config in order so that the same
+        # seed produces the same population in every scenario
+        self.budgets: List[int] = agent_config.get('budgets', [])
+
         # LLM parameters
         llm_config = self.config['llm']
         self.llm_client = OllamaClient(
@@ -104,6 +134,7 @@ class Simulation:
             repeat_penalty=llm_config.get('repeat_penalty', 1.1),
             repeat_last_n=llm_config.get('repeat_last_n', 128),
             min_p=llm_config.get('min_p', 0.05),
+            seed=llm_config.get('seed'),
             # None when unset: the model keeps its own thinking default
             think=llm_config.get('think'),
             timeout_seconds=llm_config.get('timeout', 300)  # [s]
@@ -165,6 +196,129 @@ class Simulation:
             for record in records:
                 f.write(json.dumps(record, ensure_ascii=False) + '\n')
 
+    def _log_metrics(self) -> None:
+        """Append one line of observable state per step to metrics.jsonl.
+
+        Everything the analysis and the dashboard need is here, so neither has
+        to re-read the LLM logs.
+        """
+        if not self.output_dir:
+            return
+
+        os.makedirs(self.output_dir, exist_ok=True)
+        record = {
+            "step": self.step,
+            "stock": dict(self.stock),
+            "impressions_cum": self.impressions,
+            "purchases_cum": len(self.purchases),
+            "ads_delivered": self.ads_delivered_this_step,
+            "agents": [
+                {
+                    "id": a.id,
+                    "pos": list(a.position),
+                    "place": a.current_place,
+                    "budget": a.budget,
+                    "ads_seen": len(a.ads_seen),
+                    "purchased_at": a.purchased_at,
+                    "purchase_place": a.purchase_place,
+                }
+                for a in self.agents
+            ],
+        }
+        with open(os.path.join(self.output_dir, "metrics.jsonl"), 'a', encoding='utf-8') as f:
+            f.write(json.dumps(record, ensure_ascii=False) + '\n')
+
+    def _targeted_agents(self, ad: Dict) -> List[Agent]:
+        """Who this campaign reaches this step.
+
+        - "all": an untargeted broadcast, every agent
+        - "in_market": agents already within `targeting_radius` of the sponsor's
+          place. This is the simulator's stand-in for retargeting: spending the
+          budget on people who are, by construction, closest to buying anyway
+        """
+        targeting = ad.get('targeting', 'all')
+
+        if targeting == 'all':
+            candidates = list(self.agents)
+        elif targeting == 'in_market':
+            place = next((p for p in self.places if p['name'] == ad['place']), None)
+            if place is None:
+                raise ValueError(f"Ad '{ad.get('name')}' targets unknown place '{ad.get('place')}'")
+            center = (place['center_x'], place['center_y'])
+            radius = ad.get('targeting_radius', 10)
+            candidates = [a for a in self.agents if a.distance_to(center) <= radius]
+        else:
+            raise ValueError(f"Unknown targeting mode: {targeting}")
+
+        # Nobody keeps paying to advertise a durable good to someone who has
+        # already bought it, so converted agents are excluded from delivery
+        return [a for a in candidates if a.purchased_at is None]
+
+    def _deliver_ads(self) -> None:
+        """Deliver every campaign active on this step and bill the impressions."""
+        self.ads_delivered_this_step = []
+        for ad in self.ad_configs:
+            start = ad['start_step']
+            end = ad.get('end_step', start)
+            if not (start <= self.step <= end):
+                continue
+
+            recipients = self._targeted_agents(ad)
+            for agent in recipients:
+                agent.ads_seen.append({
+                    'step': self.step,
+                    'sponsor': ad.get('sponsor', ad.get('name', 'advertiser')),
+                    'copy': ad['copy'],
+                })
+            self.impressions += len(recipients)
+            self.ads_delivered_this_step.append({
+                'name': ad.get('name'),
+                'to': [a.id for a in recipients],
+            })
+            if recipients:
+                logger.info(
+                    f"Step {self.step}: ad '{ad.get('name')}' delivered to "
+                    f"{len(recipients)} agent(s): {[a.id for a in recipients]}"
+                )
+
+    def _try_purchase(self, agent: Agent) -> bool:
+        """Execute a "buy" action if the world allows it.
+
+        The item is durable, so one purchase per agent. That keeps a run
+        comparable to its twin agent by agent: each agent either converted or
+        did not.
+        """
+        if agent.purchased_at is not None:
+            return False
+        if not agent.in_place or not agent.current_place:
+            return False
+
+        place = next((p for p in self.places if p['name'] == agent.current_place), None)
+        if place is None:
+            return False
+
+        price = place.get('price')
+        stock = self.stock.get(agent.current_place)
+        if price is None or stock is None or stock <= 0 or agent.budget < price:
+            return False
+
+        self.stock[agent.current_place] = stock - 1
+        agent.budget -= price
+        agent.purchased_at = self.step
+        agent.purchase_place = agent.current_place
+        self.purchases.append({
+            'step': self.step,
+            'agent_id': agent.id,
+            'place': agent.current_place,
+            'price': price,
+            'ads_seen_before_purchase': len(agent.ads_seen),
+        })
+        logger.info(
+            f"Step {self.step}: Agent {agent.id} bought 1 unit at {agent.current_place} "
+            f"(stock left {self.stock[agent.current_place]}, ads seen {len(agent.ads_seen)})"
+        )
+        return True
+
     def _generate_random_position(self) -> Tuple[int, int]:
         """Generate a random position within the space (origin-centered coordinate system)"""
         return (
@@ -218,6 +372,7 @@ class Simulation:
         # Create agents
         for i in range(self.num_agents):
             gender = random.choice(["male", "female"])
+            budget = self.budgets[i % len(self.budgets)] if self.budgets else 0
             agent = Agent(
                 agent_id=i,
                 initial_position=positions[i],
@@ -227,6 +382,7 @@ class Simulation:
                 places=self.places,
                 num_agents=self.num_agents,
                 gender=gender,
+                budget=budget,
                 memory_limit=self.memory_limit,
                 memory_size=self.memory_size,
                 message_history_limit=self.message_history_limit,
@@ -260,6 +416,8 @@ class Simulation:
                 "agents_in_place": agents_in_place,
                 "capacity": capacity,
                 "occupancy_rate": occupancy_rate,
+                "stock": self.stock.get(place_name),
+                "price": place_config.get('price'),
             }
         else:
             # Get overall status (all places combined)
@@ -278,6 +436,8 @@ class Simulation:
                     "agents_in_place": place_agents,
                     "capacity": place_capacity,
                     "occupancy_rate": place_occupancy_rate,
+                    "stock": self.stock.get(place['name']),
+                    "price": place.get('price'),
                 }
             
             return {
@@ -344,6 +504,10 @@ class Simulation:
                     f"{fc['intensity']}, radius {fc['radius']}"
                 )
 
+        # Ad delivery happens before any reasoning, so the copy is already in
+        # the prompt for both the message phase and the action phase
+        self._deliver_ads()
+
         # Update agent states
         for agent in self.agents:
             agent.update_state(self.places)
@@ -402,14 +566,19 @@ class Simulation:
         # Write all memory/reasoning records in batch (more efficient than individual writes)
         self._log_memory_reasoning_batch(memory_reasoning_records)
 
-        # Phase 4: Execute movement (after messages are sent and actions are decided)
+        # Phase 4: Execute movement and purchases
         for agent, action_decision in action_decisions:
-            if action_decision['action'] == 'move' and action_decision['direction']:
+            action = action_decision['action']
+            if action == 'buy':
+                self._try_purchase(agent)
+            elif action == 'move' and action_decision['direction']:
                 agent.move(action_decision['direction'])
 
         # Update states after movement
         for agent in self.agents:
             agent.update_state(self.places)
+
+        self._log_metrics()
 
         if self.step % LOG_INTERVAL == 0:
             # The overall status carries both the total and the per-place counts,

@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GhostLift — twin worlds replay</title>
+<style>
+  :root {
+    --bg: #10131a;
+    --panel: #171b25;
+    --line: #262c3a;
+    --ink: #e8ecf4;
+    --muted: #8b93a7;
+    --new: #2a9d8f;
+    --stolen: #e9c46a;
+    --ghost: #9aa1b2;
+    --lost: #e76f51;
+    --ad: #f4a261;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: ui-sans-serif, -apple-system, "Helvetica Neue", "Hiragino Sans", sans-serif;
+  }
+  header {
+    padding: 18px 24px 12px; border-bottom: 1px solid var(--line);
+  }
+  h1 { margin: 0; font-size: 19px; letter-spacing: .01em; }
+  .sub { color: var(--muted); font-size: 13px; margin-top: 5px; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 24px 40px; }
+  .controls {
+    display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+    padding: 14px 0; border-bottom: 1px solid var(--line); margin-bottom: 18px;
+  }
+  button, select {
+    background: var(--panel); color: var(--ink); border: 1px solid var(--line);
+    border-radius: 7px; padding: 7px 13px; font-size: 13px; cursor: pointer;
+  }
+  button:hover, select:hover { border-color: #3a4256; }
+  input[type=range] { flex: 1; min-width: 180px; accent-color: var(--new); }
+  .step { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted); min-width: 92px; }
+  .worlds { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 820px) { .worlds { grid-template-columns: 1fr; } }
+  .world {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 11px; padding: 14px;
+  }
+  .world h2 { margin: 0 0 2px; font-size: 14px; }
+  .world .tag { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+  canvas { width: 100%; height: auto; display: block; border-radius: 8px; background: #0c0f15; }
+  .stores { display: flex; gap: 16px; margin-top: 11px; font-size: 12px; color: var(--muted); }
+  .stores b { color: var(--ink); font-variant-numeric: tabular-nums; }
+  .tally {
+    margin-top: 10px; font-size: 13px; display: flex; gap: 18px;
+    font-variant-numeric: tabular-nums;
+  }
+  .legend {
+    display: flex; gap: 16px; flex-wrap: wrap; margin: 20px 0 8px;
+    font-size: 12px; color: var(--muted);
+  }
+  .legend span::before {
+    content: ""; display: inline-block; width: 9px; height: 9px;
+    border-radius: 50%; margin-right: 6px; vertical-align: 1px;
+  }
+  .lg-idle::before   { background: #5b6478; }
+  .lg-ad::before     { background: var(--ad); }
+  .lg-brand::before  { background: var(--new); }
+  .lg-rival::before  { background: #6d8ec9; }
+  .panel {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 11px; padding: 16px 18px; margin-top: 22px;
+  }
+  .panel h3 { margin: 0 0 4px; font-size: 14px; }
+  .panel .note { color: var(--muted); font-size: 12.5px; margin: 0 0 14px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .chip { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 7px; }
+  .err { color: var(--lost); font-size: 13px; padding: 12px 0; }
+  .msgs { margin-top: 8px; max-height: 132px; overflow-y: auto; font-size: 12px; color: var(--muted); }
+  .msgs div { padding: 3px 0; border-bottom: 1px solid #1d2230; }
+  .msgs b { color: var(--ink); font-weight: 500; }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap" style="padding-bottom:0">
+    <h1>GhostLift — the same eight people, with and without the ad</h1>
+    <div class="sub">
+      Both worlds share one seed, so agent 3 on the left is agent 3 on the right.
+      They are bit-identical until the campaign lands; everything that differs after that is the ad.
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="controls">
+    <button id="play">▶ 再生</button>
+    <button id="back">←</button>
+    <button id="fwd">→</button>
+    <input type="range" id="scrub" min="0" max="0" value="0">
+    <span class="step" id="stepLabel">step 0</span>
+    <select id="treatedPick">
+      <option value="output_broadcast">B: broadcast（全員配信）</option>
+      <option value="output_retarget">C: retarget（店に近い人だけ）</option>
+    </select>
+  </div>
+
+  <div id="error" class="err" hidden></div>
+
+  <div class="worlds">
+    <div class="world">
+      <h2>A — 広告なし（反実仮想）</h2>
+      <div class="tag" id="tagA">output_noad</div>
+      <canvas id="cvA" width="520" height="520"></canvas>
+      <div class="stores" id="storesA"></div>
+      <div class="tally" id="tallyA"></div>
+      <div class="msgs" id="msgsA"></div>
+    </div>
+    <div class="world">
+      <h2>B — 広告あり</h2>
+      <div class="tag" id="tagB">output_broadcast</div>
+      <canvas id="cvB" width="520" height="520"></canvas>
+      <div class="stores" id="storesB"></div>
+      <div class="tally" id="tallyB"></div>
+      <div class="msgs" id="msgsB"></div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span class="lg-idle">まだ買っていない</span>
+    <span class="lg-ad">広告を見た</span>
+    <span class="lg-brand">BrandCo で購入</span>
+    <span class="lg-rival">rival で購入</span>
+  </div>
+
+  <div class="panel">
+    <h3>広告が「作った」コンバージョンの内訳</h3>
+    <p class="note">
+      左右を1人ずつ突き合わせて分類したもの。現実の広告主が絶対に手に入れられない表です
+      — 同じ人の「広告を見た場合」と「見なかった場合」の両方が要るので。
+    </p>
+    <table id="decomp">
+      <thead>
+        <tr><th>分類</th><th>意味</th><th class="num">人数</th><th>agent</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <div id="verdict" style="margin-top:14px; font-size:13.5px; line-height:1.7"></div>
+  </div>
+</div>
+
+<script>
+const BRAND = "brandco", RIVAL = "rival";
+const HALF = 10;                 // half_space_size in the scenario files
+const PLACES = [
+  { name: BRAND, cx: -7, cy: 0, half: 3, color: "#2a9d8f" },
+  { name: RIVAL, cx:  7, cy: 0, half: 3, color: "#6d8ec9" },
+];
+
+const state = { A: null, B: null, msgA: [], msgB: [], step: 0, timer: null };
+
+async function loadJsonl(dir, file) {
+  const res = await fetch(`../${dir}/${file}`);
+  if (!res.ok) throw new Error(`${dir}/${file} が読めません (${res.status})`);
+  return (await res.text()).trim().split("\n").filter(Boolean).map(JSON.parse);
+}
+
+async function loadWorlds(treatedDir) {
+  const [a, b] = await Promise.all([
+    loadJsonl("output_noad", "metrics.jsonl"),
+    loadJsonl(treatedDir, "metrics.jsonl"),
+  ]);
+  state.A = a; state.B = b;
+  // Messages are optional: a run can be replayed without them
+  state.msgA = await loadJsonl("output_noad", "messages.jsonl").catch(() => []);
+  state.msgB = await loadJsonl(treatedDir, "messages.jsonl").catch(() => []);
+
+  const maxStep = Math.min(a.length, b.length);
+  const scrub = document.getElementById("scrub");
+  scrub.max = maxStep - 1;
+  scrub.value = 0;
+  state.step = 0;
+  document.getElementById("tagB").textContent = treatedDir;
+  render();
+}
+
+function toPx(v, size) { return ((v + HALF) / (2 * HALF)) * (size - 40) + 20; }
+
+function drawWorld(canvas, rec, prevRec) {
+  const ctx = canvas.getContext("2d");
+  const S = canvas.width;
+  ctx.clearRect(0, 0, S, S);
+
+  // grid
+  ctx.strokeStyle = "#1a1f2b"; ctx.lineWidth = 1;
+  for (let i = -HALF; i <= HALF; i += 5) {
+    const p = toPx(i, S);
+    ctx.beginPath(); ctx.moveTo(p, 20); ctx.lineTo(p, S - 20); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(20, p); ctx.lineTo(S - 20, p); ctx.stroke();
+  }
+
+  // places
+  for (const p of PLACES) {
+    const x0 = toPx(p.cx - p.half, S), x1 = toPx(p.cx + p.half, S);
+    const y0 = toPx(-(p.cy + p.half), S), y1 = toPx(-(p.cy - p.half), S);
+    ctx.fillStyle = p.color + "1e";
+    ctx.strokeStyle = p.color + "88";
+    ctx.lineWidth = 1.5;
+    ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+    ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+    ctx.fillStyle = p.color;
+    ctx.font = "12px ui-sans-serif, sans-serif";
+    ctx.textAlign = "center";
+    const stock = rec.stock ? rec.stock[p.name] : null;
+    ctx.fillText(`${p.name}  在庫 ${stock ?? "-"}`, (x0 + x1) / 2, y0 - 7);
+  }
+
+  // agents
+  const adTargets = new Set();
+  (rec.ads_delivered || []).forEach(a => (a.to || []).forEach(id => adTargets.add(id)));
+
+  for (const a of rec.agents) {
+    const x = toPx(a.pos[0], S), y = toPx(-a.pos[1], S);
+    const place = a.purchase_place;
+
+    let color = "#5b6478";
+    if (place === BRAND) color = "#2a9d8f";
+    else if (place === RIVAL) color = "#6d8ec9";
+    else if (a.ads_seen > 0) color = "#f4a261";
+
+    // a pulse on the step the ad actually landed on this agent
+    if (adTargets.has(a.id)) {
+      ctx.beginPath(); ctx.arc(x, y, 15, 0, Math.PI * 2);
+      ctx.fillStyle = "#f4a26133"; ctx.fill();
+    }
+    // a ring on the step the purchase happened
+    if (a.purchased_at === rec.step) {
+      ctx.beginPath(); ctx.arc(x, y, 12, 0, Math.PI * 2);
+      ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.stroke();
+    }
+
+    ctx.beginPath(); ctx.arc(x, y, 6.5, 0, Math.PI * 2);
+    ctx.fillStyle = color; ctx.fill();
+    ctx.fillStyle = "#0c0f15";
+    ctx.font = "bold 9px ui-sans-serif, sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(String(a.id), x, y);
+    ctx.textBaseline = "alphabetic";
+  }
+}
+
+function tallyHtml(rec) {
+  const brand = rec.agents.filter(a => a.purchase_place === BRAND).length;
+  const rival = rec.agents.filter(a => a.purchase_place === RIVAL).length;
+  return `<span>BrandCo <b>${brand}</b></span>
+          <span>rival <b>${rival}</b></span>
+          <span style="color:var(--muted)">imp <b>${rec.impressions_cum}</b></span>`;
+}
+
+function storesHtml(rec) {
+  return PLACES.map(p =>
+    `<span>${p.name} 在庫 <b>${rec.stock ? rec.stock[p.name] : "-"}</b></span>`).join("");
+}
+
+function msgsHtml(msgs, step) {
+  const here = msgs.filter(m => m.step === step);
+  if (!here.length) return `<div style="color:#5b6478">口コミなし</div>`;
+  const seen = new Set();
+  return here.filter(m => {
+    const k = m.from + "|" + m.message;
+    if (seen.has(k)) return false;
+    seen.add(k); return true;
+  }).map(m => `<div><b>#${m.from}</b> ${m.message}</div>`).join("");
+}
+
+function decompose(aRec, bRec) {
+  const before = Object.fromEntries(aRec.agents.map(a => [a.id, a.purchase_place]));
+  const after = Object.fromEntries(bRec.agents.map(a => [a.id, a.purchase_place]));
+  const buckets = { new: [], stolen: [], ghost: [], lost: [] };
+  for (const id of Object.keys(after).map(Number).sort((x, y) => x - y)) {
+    const bBrand = before[id] === BRAND, aBrand = after[id] === BRAND;
+    if (aBrand && !bBrand) (before[id] ? buckets.stolen : buckets.new).push(id);
+    else if (aBrand && bBrand) buckets.ghost.push(id);
+    else if (bBrand && !aBrand) buckets.lost.push(id);
+  }
+  return buckets;
+}
+
+const BUCKET_META = {
+  new:    ["NEW",    "広告が本当に生んだ需要",       "var(--new)"],
+  stolen: ["STOLEN", "競合から奪った（市場全体はゼロ）", "var(--stolen)"],
+  ghost:  ["GHOST",  "広告がなくても買っていた",      "var(--ghost)"],
+  lost:   ["LOST",   "広告が壊した売上（未計上）",     "var(--lost)"],
+};
+
+function renderDecomp(aRec, bRec) {
+  const b = decompose(aRec, bRec);
+  const tbody = document.querySelector("#decomp tbody");
+  tbody.innerHTML = Object.entries(BUCKET_META).map(([k, [name, desc, color]]) =>
+    `<tr>
+       <td><span class="chip" style="background:${color}"></span>${name}</td>
+       <td style="color:var(--muted)">${desc}</td>
+       <td class="num">${b[k].length}</td>
+       <td style="color:var(--muted)">${b[k].join(", ") || "—"}</td>
+     </tr>`).join("");
+
+  const attributed = b.new.length + b.stolen.length + b.ghost.length;
+  const incremental = b.new.length + b.stolen.length - b.lost.length;
+  const ratio = incremental > 0 ? (attributed / incremental).toFixed(2) + "倍" : "計算不能（純増ゼロ以下）";
+  document.getElementById("verdict").innerHTML =
+    `広告プラットフォームが報告するCV: <b>${attributed}</b> ／
+     BrandCo の実際の純増: <b>${incremental}</b> ／
+     <b style="color:var(--ad)">見かけは実態の ${ratio}</b>
+     <span style="color:var(--muted)">（imp ${bRec.impressions_cum}）</span>`;
+}
+
+function render() {
+  if (!state.A || !state.B) return;
+  const i = Math.min(state.step, state.A.length - 1, state.B.length - 1);
+  const a = state.A[i], b = state.B[i];
+
+  drawWorld(document.getElementById("cvA"), a, state.A[i - 1]);
+  drawWorld(document.getElementById("cvB"), b, state.B[i - 1]);
+  document.getElementById("storesA").innerHTML = storesHtml(a);
+  document.getElementById("storesB").innerHTML = storesHtml(b);
+  document.getElementById("tallyA").innerHTML = tallyHtml(a);
+  document.getElementById("tallyB").innerHTML = tallyHtml(b);
+  document.getElementById("msgsA").innerHTML = msgsHtml(state.msgA, a.step);
+  document.getElementById("msgsB").innerHTML = msgsHtml(state.msgB, b.step);
+  document.getElementById("stepLabel").textContent = `step ${a.step} / ${state.A.length}`;
+  document.getElementById("scrub").value = i;
+  renderDecomp(a, b);
+}
+
+function setStep(i) {
+  const max = Math.min(state.A.length, state.B.length) - 1;
+  state.step = Math.max(0, Math.min(i, max));
+  render();
+}
+
+document.getElementById("scrub").addEventListener("input", e => setStep(+e.target.value));
+document.getElementById("back").addEventListener("click", () => setStep(state.step - 1));
+document.getElementById("fwd").addEventListener("click", () => setStep(state.step + 1));
+document.getElementById("play").addEventListener("click", togglePlay);
+document.getElementById("treatedPick").addEventListener("change", e => {
+  stop();
+  loadWorlds(e.target.value).catch(showError);
+});
+document.addEventListener("keydown", e => {
+  if (e.code === "Space") { e.preventDefault(); togglePlay(); }
+  if (e.code === "ArrowLeft") setStep(state.step - 1);
+  if (e.code === "ArrowRight") setStep(state.step + 1);
+});
+
+function stop() {
+  if (state.timer) { clearInterval(state.timer); state.timer = null; }
+  document.getElementById("play").textContent = "▶ 再生";
+}
+
+function togglePlay() {
+  if (state.timer) return stop();
+  document.getElementById("play").textContent = "❚❚ 停止";
+  state.timer = setInterval(() => {
+    const max = Math.min(state.A.length, state.B.length) - 1;
+    if (state.step >= max) return stop();
+    setStep(state.step + 1);
+  }, 700);
+}
+
+function showError(err) {
+  const el = document.getElementById("error");
+  el.hidden = false;
+  el.textContent = `${err.message} — リポジトリ直下で python scripts/serve.py を実行し、`
+    + ` http://localhost:8124/demo/dashboard.html を開いてください。`;
+}
+
+loadWorlds(document.getElementById("treatedPick").value).catch(showError);
+</script>
+</body>
+</html>
