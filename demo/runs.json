@@ -1,0 +1,38 @@
+{
+  "runs": [
+    {
+      "dir": "output_broadcast",
+      "scenario": "broadcast",
+      "seed": null,
+      "steps": 1
+    },
+    {
+      "dir": "output_noad",
+      "scenario": "noad",
+      "seed": null,
+      "steps": 1
+    },
+    {
+      "dir": "output_retarget",
+      "scenario": "retarget",
+      "seed": null,
+      "steps": 1
+    }
+  ],
+  "pairs": [
+    {
+      "control": "output_noad",
+      "treated": "output_broadcast",
+      "scenario": "broadcast",
+      "seed": null,
+      "steps": 1
+    },
+    {
+      "control": "output_noad",
+      "treated": "output_retarget",
+      "scenario": "retarget",
+      "seed": null,
+      "steps": 1
+    }
+  ]
+}

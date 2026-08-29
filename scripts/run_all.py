@@ -132,6 +132,9 @@ def main() -> None:
             continue
         analyse(seed, out_dirs)
 
+    subprocess.run([venv_python(), os.path.join(REPO, "scripts", "make_manifest.py")],
+                   cwd=REPO, check=False)
+
     if len(seeds) > 1:
         print("\nAggregate across seeds:")
         subprocess.run(

@@ -101,10 +101,7 @@
     <button id="fwd">→</button>
     <input type="range" id="scrub" min="0" max="0" value="0">
     <span class="step" id="stepLabel">step 0</span>
-    <select id="treatedPick">
-      <option value="output_broadcast">B: broadcast（全員配信）</option>
-      <option value="output_retarget">C: retarget（店に近い人だけ）</option>
-    </select>
+    <select id="treatedPick"></select>
   </div>
 
   <div id="error" class="err" hidden></div>
@@ -159,7 +156,7 @@ const PLACES = [
   { name: RIVAL, cx:  7, cy: 0, half: 3, color: "#6d8ec9" },
 ];
 
-const state = { A: null, B: null, msgA: [], msgB: [], step: 0, timer: null };
+const state = { A: null, B: null, msgA: [], msgB: [], step: 0, timer: null, pairs: [] };
 
 async function loadJsonl(dir, file) {
   const res = await fetch(`../${dir}/${file}`);
@@ -167,22 +164,55 @@ async function loadJsonl(dir, file) {
   return (await res.text()).trim().split("\n").filter(Boolean).map(JSON.parse);
 }
 
-async function loadWorlds(treatedDir) {
+// Which runs exist depends on what was run - one trial, several seeds, or a
+// subset - so the pairs come from a manifest rather than being hard-coded.
+const FALLBACK_PAIRS = [
+  { control: "output_noad", treated: "output_broadcast", scenario: "broadcast", seed: null },
+  { control: "output_noad", treated: "output_retarget", scenario: "retarget", seed: null },
+];
+
+const SCENARIO_LABEL = {
+  broadcast: "B: broadcast（全員配信）",
+  retarget: "C: retarget（店に近い人だけ）",
+};
+
+async function loadManifest() {
+  try {
+    const res = await fetch("runs.json", { cache: "no-store" });
+    if (!res.ok) throw new Error("no manifest");
+    const data = await res.json();
+    if (data.pairs && data.pairs.length) return data.pairs;
+  } catch (e) { /* fall through to the default pair names */ }
+  return FALLBACK_PAIRS;
+}
+
+function fillSelector(pairs) {
+  const sel = document.getElementById("treatedPick");
+  sel.innerHTML = pairs.map((p, i) => {
+    const label = SCENARIO_LABEL[p.scenario] || p.treated;
+    const seed = p.seed == null ? "" : `  · seed ${p.seed}`;
+    return `<option value="${i}">${label}${seed}</option>`;
+  }).join("");
+  state.pairs = pairs;
+}
+
+async function loadWorlds(pair) {
   const [a, b] = await Promise.all([
-    loadJsonl("output_noad", "metrics.jsonl"),
-    loadJsonl(treatedDir, "metrics.jsonl"),
+    loadJsonl(pair.control, "metrics.jsonl"),
+    loadJsonl(pair.treated, "metrics.jsonl"),
   ]);
   state.A = a; state.B = b;
   // Messages are optional: a run can be replayed without them
-  state.msgA = await loadJsonl("output_noad", "messages.jsonl").catch(() => []);
-  state.msgB = await loadJsonl(treatedDir, "messages.jsonl").catch(() => []);
+  state.msgA = await loadJsonl(pair.control, "messages.jsonl").catch(() => []);
+  state.msgB = await loadJsonl(pair.treated, "messages.jsonl").catch(() => []);
 
   const maxStep = Math.min(a.length, b.length);
   const scrub = document.getElementById("scrub");
   scrub.max = maxStep - 1;
   scrub.value = 0;
   state.step = 0;
-  document.getElementById("tagB").textContent = treatedDir;
+  document.getElementById("tagA").textContent = pair.control;
+  document.getElementById("tagB").textContent = pair.treated;
   render();
 }
 
@@ -346,7 +376,7 @@ document.getElementById("fwd").addEventListener("click", () => setStep(state.ste
 document.getElementById("play").addEventListener("click", togglePlay);
 document.getElementById("treatedPick").addEventListener("change", e => {
   stop();
-  loadWorlds(e.target.value).catch(showError);
+  loadWorlds(state.pairs[+e.target.value]).catch(showError);
 });
 document.addEventListener("keydown", e => {
   if (e.code === "Space") { e.preventDefault(); togglePlay(); }
@@ -376,7 +406,9 @@ function showError(err) {
     + ` http://localhost:8124/demo/dashboard.html を開いてください。`;
 }
 
-loadWorlds(document.getElementById("treatedPick").value).catch(showError);
+loadManifest()
+  .then(pairs => { fillSelector(pairs); return loadWorlds(pairs[0]); })
+  .catch(showError);
 </script>
 </body>
 </html>

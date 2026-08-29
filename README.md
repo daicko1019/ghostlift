@@ -169,11 +169,13 @@ C が介入実験の本命です。実務のリターゲティングは「効率
 │   ├── ghost_analysis.py          # ★ 反実仮想ペアの4分類と作図
 │   ├── verify_twins.py            # ★ 広告前の2世界が同一であることの検証
 │   ├── aggregate_trials.py        # 複数シード試行の集計
+│   ├── make_manifest.py           # 存在するランを demo/runs.json に列挙
 │   └── serve.py                   # デモ用静的サーバー
 ├── demo/
 │   ├── dashboard.html             # 二画面リプレイ（単一HTML・依存なし）
 │   ├── ghost_decomposition.png    # 分解の図
-│   └── ghost_summary.json         # 分解の数値
+│   ├── ghost_summary.json         # 分解の数値
+│   └── runs.json                  # 再生できるランの一覧（ダッシュボードが読む）
 ├── sample_output/                 # 実行結果の生ログ（実行しなくても再生可）
 ├── viewer/                        # 本家付属のビューア・動画生成
 └── docs/
