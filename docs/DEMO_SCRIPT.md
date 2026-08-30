@@ -43,3 +43,45 @@ python scripts/serve.py
 - YouTube に**限定公開**でアップ（「非公開」ではない。非公開だと審査員が見られない）
 - URL を提出フォームに貼る
 - ファイル名は `参加者番号_氏名_GhostLift_動画` の形式、半角英数字で
+
+---
+
+## 生成済みの動画（画面録画なしで作ったもの）
+
+`demo/ghostlift_demo.mp4`（2分17秒・1920x1080）を同梱している。
+手で画面録画したものではなく、**素材をプログラムで生成して組んだ**もの。
+
+作り方:
+
+1. ダッシュボードは `#step=N` で任意のステップを表示できるので、headless Chrome で
+   24ステップぶんスクリーンショットを撮る（`demo/dashboard.html#step=1` … `#step=24`）
+2. 説明スライド（`docs/slides.html`）を8枚の静止画として切り出す
+3. 字幕カードを3枚生成する（音声なしでも何を見ればいいか伝わるように）
+4. ffmpeg の concat デマクサで、台本どおりの尺で並べる
+
+```bash
+python scripts/serve.py          # 別端末で
+# 24ステップぶんのコマ撮り
+for i in $(seq 1 24); do
+  chrome --headless --window-size=1600,1080 --virtual-time-budget=3500 \
+    --screenshot="frames/dash_$(printf %03d $i).png" \
+    "http://localhost:8124/demo/dashboard.html#step=$i"
+done
+```
+
+再生時間の配分は、`step 4`（広告着弾）を5秒、広告前の3ステップを各2.4秒と長めに取り、
+中盤以降を1.6秒に詰めてある。**左右が同一であることを見せる時間**と、
+**分岐が起きる瞬間**にだけ尺を使う設計。
+
+### AKARI Video で仕上げる場合
+
+`~/Akari/channels/my-channel/videos/2026-08-30-ghostlift/` にプロジェクトを作ってある。
+
+```bash
+cd ~/Akari/channels/my-channel/videos/2026-08-30-ghostlift
+akari.sh                 # 編集エージェントを起動
+akari.sh --preview       # 別端末でプレビュー
+```
+
+`edit.json` が編集の正本で、上記の mp4 を1本のカットとして置いてある。
+ナレーション（VOICEVOX）・BGM・オーバーレイを足す土台として使える。
