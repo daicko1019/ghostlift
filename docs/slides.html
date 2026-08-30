@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>GhostLift — 説明スライド</title>
+<style>
+  @page { size: 1280px 720px; margin: 0; }
+  :root {
+    --ink: #16181d;
+    --muted: #6b7280;
+    --line: #d9dde5;
+    --bg: #ffffff;
+    --new: #2a9d8f;
+    --stolen: #d9a520;
+    --ghost: #9aa1b2;
+    --lost: #e76f51;
+    --accent: #1d4ed8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: #6b7280; color: var(--ink);
+    font-family: "Hiragino Sans", "Noto Sans JP", ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .slide {
+    width: 1280px; height: 720px; background: var(--bg);
+    padding: 62px 76px; margin: 0 auto 26px; position: relative;
+    display: flex; flex-direction: column; overflow: hidden;
+    page-break-after: always; break-after: page;
+  }
+  .slide:last-child { page-break-after: auto; margin-bottom: 0; }
+  .kicker {
+    font-size: 15px; letter-spacing: .16em; color: var(--muted);
+    text-transform: uppercase; margin-bottom: 18px; font-weight: 600;
+  }
+  h1 { font-size: 62px; line-height: 1.16; margin: 0 0 24px; letter-spacing: -.015em; }
+  h2 { font-size: 40px; line-height: 1.24; margin: 0 0 26px; letter-spacing: -.01em; }
+  p  { font-size: 22px; line-height: 1.72; margin: 0 0 16px; }
+  .lead { font-size: 26px; line-height: 1.7; }
+  .muted { color: var(--muted); }
+  .num { font-variant-numeric: tabular-nums; }
+  .pagenum {
+    position: absolute; right: 40px; bottom: 28px;
+    font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums;
+  }
+  .foot {
+    position: absolute; left: 76px; bottom: 28px;
+    font-size: 14px; color: var(--muted);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 19px; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 16px; }
+  td.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .chip { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 9px; vertical-align: 0; }
+  td.label { white-space: nowrap; width: 1%; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 46px; flex: 1; min-height: 0; }
+  .cols-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px; }
+  .card {
+    border: 1px solid var(--line); border-radius: 12px; padding: 22px 24px;
+  }
+  .card h3 { margin: 0 0 10px; font-size: 21px; }
+  .card p { font-size: 17px; line-height: 1.62; margin: 0; color: var(--muted); }
+  .big { font-size: 78px; font-weight: 700; line-height: 1; letter-spacing: -.02em; }
+  .big.sub { font-size: 20px; font-weight: 400; color: var(--muted); letter-spacing: 0; }
+  .rule { height: 1px; background: var(--line); margin: 26px 0; }
+  .tag {
+    display: inline-block; padding: 4px 12px; border-radius: 999px;
+    font-size: 15px; background: #eef1f6; color: var(--muted); margin-right: 8px;
+  }
+  img.fig { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .figwrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+  code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .92em; background: #f2f4f8; padding: 1px 6px; border-radius: 4px; }
+  .quote {
+    border-left: 4px solid var(--accent); padding-left: 22px; font-size: 27px;
+    line-height: 1.6; margin: 8px 0 22px;
+  }
+</style>
+</head>
+<body>
+
+<!-- 1 -->
+<div class="slide">
+  <div class="kicker">AIエージェント社会シミュレーション・ハッカソン</div>
+  <h1>GhostLift</h1>
+  <p class="lead" style="font-size:32px; margin-bottom:34px;">
+    その広告は、需要を作ったのか、数えただけか
+  </p>
+  <div class="rule"></div>
+  <p class="muted" style="font-size:20px;">
+    掛け算の2語 ── <strong style="color:var(--ink)">広告出稿（情報） × 需要の増分（資源）</strong>
+  </p>
+  <p class="muted" style="font-size:20px;">
+    問い ── <strong style="color:var(--ink)">そのコンバージョンは、広告が作ったのか、
+    元々買う人を数えただけなのか</strong>
+  </p>
+  <p class="muted" style="font-size:19px; margin-top:auto; margin-bottom:0;">
+    github.com/daicko1019/ghostlift ／ SD-AgentFoundry-2D（兵頭龍樹）を基に構築
+  </p>
+  <div class="pagenum">1</div>
+</div>
+
+<!-- 2 -->
+<div class="slide">
+  <div class="kicker">問い</div>
+  <h2>「広告の成果です」と報告されたCVは、<br>本当は何でできているのか</h2>
+  <div class="cols" style="grid-template-columns: 1.05fr 1fr; align-items:start;">
+    <div>
+      <table>
+        <tr>
+          <td class="label"><span class="chip" style="background:var(--new)"></span><strong>NEW</strong></td>
+          <td>広告が本当に生んだ購買</td>
+          <td class="muted">計上される</td>
+        </tr>
+        <tr>
+          <td class="label"><span class="chip" style="background:var(--stolen)"></span><strong>STOLEN</strong></td>
+          <td>競合から奪った購買<br><span class="muted">ブランドには増分、市場には増分ゼロ</span></td>
+          <td class="muted">計上される</td>
+        </tr>
+        <tr>
+          <td class="label"><span class="chip" style="background:var(--ghost)"></span><strong>GHOST</strong></td>
+          <td>広告がなくても買っていた人</td>
+          <td><strong>計上される</strong></td>
+        </tr>
+        <tr>
+          <td class="label"><span class="chip" style="background:var(--lost)"></span><strong>LOST</strong></td>
+          <td>広告のせいで失われた購買</td>
+          <td><strong>決して計上されない</strong></td>
+        </tr>
+      </table>
+    </div>
+    <div>
+      <p>広告プラットフォームは、広告に接触した後に買った人をすべて成果として数えます。</p>
+      <p>しかしその中には、<strong>放っておいても買っていた人</strong>が混ざっています。
+         そして、広告が<strong>壊した</strong>売上は、どこにも現れません。</p>
+      <p class="muted">この4つを分離できれば、広告費の意思決定が変わります。</p>
+    </div>
+  </div>
+  <div class="pagenum">2</div>
+</div>
+
+<!-- 3 -->
+<div class="slide">
+  <div class="kicker">なぜシミュレーションなのか</div>
+  <h2>同じ人の「広告を見た人生」と<br>「見なかった人生」を、両方観測する</h2>
+  <div class="quote">
+    現実の広告効果測定が解けないのは、<strong>同一人物の両方を同時に見られない</strong>から。
+    A/Bテストが比べているのは別々の人の集団であって、同じ人の2つの人生ではない。
+  </div>
+  <div class="cols-3" style="margin-top:6px;">
+    <div class="card">
+      <h3>同一シード</h3>
+      <p>同じ12人・同じ初期位置・同じ財布を生成する。agent 3 は、どちらの世界でも同じ人物。</p>
+    </div>
+    <div class="card">
+      <h3>広告だけが違う</h3>
+      <p>3つの設定ファイルの差は <code>ad_campaigns</code> ブロックだけ。世界も人も在庫も同一。</p>
+    </div>
+    <div class="card">
+      <h3>個人単位で突き合わせ</h3>
+      <p>「Aで買ったか／Bで買ったか」の2×2で、冒頭の4分類がそのまま出る。</p>
+    </div>
+  </div>
+  <div class="foot">現実の広告主が絶対に手に入れられないデータを、仮想市場で作る</div>
+  <div class="pagenum">3</div>
+</div>
+
+<!-- 4 -->
+<div class="slide">
+  <div class="kicker">世界の設計</div>
+  <h2>ベースの部品に割り当てる</h2>
+  <table>
+    <thead><tr><th>SD-AgentFoundry-2D の部品</th><th>GhostLift での割り当て</th></tr></thead>
+    <tbody>
+      <tr><td>エージェント</td><td>消費者 12人。それぞれ<strong>予算</strong>（数値）を持つ</td></tr>
+      <tr><td>場所（places）</td><td>店2軒 ── 広告を出す <code>brandco</code>、出さない <code>rival</code></td></tr>
+      <tr><td>場所の数値（capacity）</td><td><strong>在庫と価格</strong>。店内にいる人だけが残数を知れる</td></tr>
+      <tr><td>局所イベント（fires）</td><td><span class="muted">未使用</span></td></tr>
+      <tr><td>全域イベント</td><td><strong>広告（ad_campaigns）</strong>。ターゲティング指定つき</td></tr>
+      <tr><td>口コミ（messages）</td><td>そのまま。オーガニック需要の伝播</td></tr>
+      <tr><td><span class="muted">（新規）</span></td><td><strong><code>buy</code> アクション</strong>。買うかどうかは LLM の判断</td></tr>
+    </tbody>
+  </table>
+  <div class="rule"></div>
+  <p style="font-size:20px; margin:0;">
+    <strong>火事と広告の対称性</strong> ── 本家の火事は「<em>距離</em>で決まる知覚」。GhostLift の広告は
+    「<em>ターゲティング</em>で決まる配信」。同じ局所ショックでも、<strong>誰が知るかを決めるのが
+    自然法則か広告主か</strong>が違う。
+  </p>
+  <div class="pagenum">4</div>
+</div>
+
+<!-- 5 -->
+<div class="slide">
+  <div class="kicker">介入点</div>
+  <h2>同じ予算を、誰に当てるか</h2>
+  <div class="cols-3" style="flex:none; margin-bottom:26px;">
+    <div class="card">
+      <h3>A ── 広告なし</h3>
+      <p>反実仮想の基準。誰も広告を出さない世界。</p>
+    </div>
+    <div class="card">
+      <h3>B ── 全員配信</h3>
+      <p>未購入の全員に同じ広告。狙いを定めない出稿。</p>
+    </div>
+    <div class="card" style="border-color:var(--accent); border-width:2px;">
+      <h3>C ── リターゲティング</h3>
+      <p>店から半径6以内の人だけに配信。<strong>すでに買う気の人</strong>に予算を集中させる。</p>
+    </div>
+  </div>
+  <div class="quote" style="border-color:var(--lost);">
+    仮説 ── リターゲティングが「効率が良い」とされるのは、
+    <strong>もともと買う人に当てているから効率が良く見えるだけ</strong>ではないか。
+  </div>
+  <p class="muted">実務で最も広く使われている施策で、見かけの数字と実態の乖離が最大になるはずの場所を狙った。</p>
+  <div class="pagenum">5</div>
+</div>
+
+<!-- 6 : RESULTS -->
+<div class="slide" id="results-slide">
+  <div class="kicker">結果</div>
+  <h2>報告されたCVの中身</h2>
+  <!-- RESULTS_BODY -->
+  <div class="pagenum">6</div>
+</div>
+
+<!-- 7 -->
+<div class="slide">
+  <div class="kicker">技術的な核心</div>
+  <h2>双子ランは、条件を満たさないと成立しない</h2>
+  <p style="margin-bottom:20px;">
+    本家は「初期位置と性格が毎回ランダムで、厳密な再現は不可能」と明記している。
+    増分を個人単位で測るには、まずここを解く必要があった。そして解いた後に、
+    <strong>もっと厄介な落とし穴</strong>があった。
+  </p>
+  <table style="font-size:18px;">
+    <thead><tr><th>条件</th><th>世界の状態<br><span class="muted">位置・行動・購買・在庫</span></th><th>口コミ・記憶<br><span class="muted">世界に戻る</span></th><th>reasoning<br><span class="muted">ログのみ</span></th></tr></thead>
+    <tbody>
+      <tr><td>同一設定・コールド vs ウォーム</td><td>一致</td><td style="color:var(--lost)"><strong>不一致</strong></td><td style="color:var(--lost)">不一致</td></tr>
+      <tr><td>同一設定・ウォーム vs ウォーム</td><td>一致</td><td>一致</td><td>一致</td></tr>
+      <tr><td>広告前の双子・逐次実行</td><td>一致</td><td>一致</td><td style="color:var(--lost)">不一致</td></tr>
+      <tr><td>広告前の双子・同時実行</td><td>一致</td><td>一致</td><td>一致</td></tr>
+    </tbody>
+  </table>
+  <div class="rule"></div>
+  <p style="font-size:19px; margin:0;">
+    <strong>モデルが冷えているランは、生成が変わる。</strong>取る行動は変わらないが、口コミと記憶の文面が
+    変わり、これらは次のプロンプトに戻るので、広告を出す前から世界が分岐する。
+    Apple M1 / Ollama 0.33 と RTX 3090 / Ollama 0.20 の<strong>両方で再現</strong>した。
+    対策としてウォームアップを必須にし、<code>verify_twins.py</code> で毎回検証している。
+  </p>
+  <div class="pagenum">7</div>
+</div>
+
+<!-- 8 -->
+<div class="slide">
+  <div class="kicker">限界と次の一手</div>
+  <h2>これは予測ではなく、仮説生成の道具</h2>
+  <div class="cols">
+    <div>
+      <h3 style="font-size:22px; margin:0 0 14px;">言えないこと</h3>
+      <p style="font-size:19px;">・検証済みの人間行動予測ではない</p>
+      <p style="font-size:19px;">・実在の広告媒体の測定精度を示すものではない</p>
+      <p style="font-size:19px;">・実データは一切使っていない。完全に架空の市場</p>
+      <p style="font-size:19px;">・ログの情景描写はLLMの生成物であって、シミュレータの状態ではない</p>
+    </div>
+    <div>
+      <h3 style="font-size:22px; margin:0 0 14px;">次の一手</h3>
+      <p style="font-size:19px;">・試行数を増やし、分解を分布として報告する</p>
+      <p style="font-size:19px;">・実際のGA4・広告実績と突き合わせ、乖離を測って補正する</p>
+      <p style="font-size:19px;">・チャネルを増やす（記事・SNS・メール）。予算配分の探索へ</p>
+      <p style="font-size:19px;">・同じ構造は、影響工作や公共キャンペーンの効果測定にも当てはまる</p>
+    </div>
+  </div>
+  <div class="rule"></div>
+  <p class="muted" style="font-size:18px; margin:0;">
+    ベース: SD-AgentFoundry-2D © 2026 Dr. Ryuki HYODO（Apache License 2.0）／
+    改変部分も Apache 2.0 で公開 ── github.com/daicko1019/ghostlift
+  </p>
+  <div class="pagenum">8</div>
+</div>
+
+</body>
+</html>

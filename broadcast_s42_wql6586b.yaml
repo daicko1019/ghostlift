@@ -1,0 +1,66 @@
+# B: identical world to scenario_noad.yaml, plus an untargeted ad campaign.
+# Everyone who has not bought yet sees the same copy on steps 5-9.
+
+seed: 42  # Same seed in all scenarios => the same 8 people, same starting spots
+
+simulation:
+  duration: 22
+  half_space_size: 10   # Small field: 1 cell/step, so a store must be reachable
+  half_place_size: 3
+
+agents:
+  num_agents: 12
+  communication_radius: 5
+  memory_limit: 20
+  memory_size: 5
+  message_history_limit: 10
+  message_context_size: 3
+  # Handed out in agent-id order, so agent 3 is the same person in every scenario
+  budgets: [4, 4, 5, 5, 6, 6, 7, 8, 8, 9, 10, 12]
+
+places:
+  - name: "brandco"
+    type: "store"
+    center_x: -7
+    center_y: 0
+    half_size: 3
+    capacity: 8
+    stock: 4      # Deliberately scarce: the advertised shelf can actually empty
+    price: 5
+  - name: "rival"
+    type: "store"
+    center_x: 7
+    center_y: 0
+    half_size: 3
+    capacity: 8
+    stock: 5
+    price: 4
+
+ad_campaigns:
+  - name: "broadcast"
+    sponsor: "BrandCo"
+    copy: "BrandCo tote, 20% off this week. Stock is limited."
+    start_step: 4
+    end_step: 9
+    targeting: all     # Untargeted: every agent who has not bought yet
+
+llm:
+  model: "qwen3:4b-instruct-2507-q4_K_M"
+  base_url: "http://localhost:11434"
+  temperature: 0.2
+  seed: 42
+  think: false
+  max_tokens: 512
+  timeout: 300
+  repeat_penalty: 1.1
+  repeat_last_n: 128
+  min_p: 0.05
+
+visualization:
+  save_frames: true
+  frame_interval: 1
+  output_dir: "output_broadcast_s42"
+
+logging:
+  level: "INFO"
+  log_file: "simulation_broadcast_s42.log"
