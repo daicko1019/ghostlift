@@ -1,0 +1,80 @@
+[
+  {
+    "id": "n01",
+    "path": "outputs/ghostlift/n01.wav",
+    "duration": 5.16,
+    "text": "その広告は、需要を作ったのか、数えただけか。"
+  },
+  {
+    "id": "n02",
+    "path": "outputs/ghostlift/n02.wav",
+    "duration": 13.32,
+    "text": "広告を出すと、コンバージョンが報告されます。でもその数字は、広告が作ったものなのか、放っておいても買った人を、数えただけなのか。"
+  },
+  {
+    "id": "n03",
+    "path": "outputs/ghostlift/n03.wav",
+    "duration": 11.4,
+    "text": "現実の広告効果測定が解けないのは、同じ人の、広告を見た場合と見なかった場合を、同時に観測できないからです。"
+  },
+  {
+    "id": "n04",
+    "path": "outputs/ghostlift/n04.wav",
+    "duration": 9.4,
+    "text": "左が広告のない世界、右が広告のある世界。同じ番号の点は、同じ人物です。"
+  },
+  {
+    "id": "n05",
+    "path": "outputs/ghostlift/n05.wav",
+    "duration": 10.4,
+    "text": "広告が届くまで、二つの世界は完全に同一です。口コミの文面も、記憶も、一文字違いません。"
+  },
+  {
+    "id": "n06",
+    "path": "outputs/ghostlift/n06.wav",
+    "duration": 10.76,
+    "text": "ステップ四。右の世界にだけ、広告が届きます。ここから先の差は、すべて広告に起因します。"
+  },
+  {
+    "id": "n07",
+    "path": "outputs/ghostlift/n07.wav",
+    "duration": 5.76,
+    "text": "点が店に向かい、買った人の色が変わり、在庫が減っていきます。"
+  },
+  {
+    "id": "n08",
+    "path": "outputs/ghostlift/n08.wav",
+    "duration": 4.28,
+    "text": "広告のある世界だけ、棚が空になりました。"
+  },
+  {
+    "id": "n09",
+    "path": "outputs/ghostlift/n09.wav",
+    "duration": 10.36,
+    "text": "広告は需要を作らず、前倒ししただけでした。その結果、本来買うはずだった人が、買えなくなります。"
+  },
+  {
+    "id": "n10",
+    "path": "outputs/ghostlift/n10.wav",
+    "duration": 7.88,
+    "text": "報告されたコンバージョンは、四件。しかし本当に増えたのは、一件だけでした。"
+  },
+  {
+    "id": "n11",
+    "path": "outputs/ghostlift/n11.wav",
+    "duration": 9.24,
+    "text": "二件は、広告がなくても買っていた人。さらに一件は、広告のせいで失われた売上です。"
+  },
+  {
+    "id": "n12",
+    "path": "outputs/ghostlift/n12.wav",
+    "duration": 8.32,
+    "text": "この比較は、広告前の二つの世界が同一であることを検証できた実行だけで行っています。"
+  },
+  {
+    "id": "n13",
+    "path": "outputs/ghostlift/n13.wav",
+    "duration": 5.36,
+    "text": "これは予測ではなく、仮説を作るための道具です。"
+  }
+]
