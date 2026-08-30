@@ -219,7 +219,47 @@
 <div class="slide" id="results-slide">
   <div class="kicker">結果</div>
   <h2>報告されたCVの中身</h2>
-  <!-- RESULTS_BODY -->
+  <div class="cols" style="grid-template-columns: 1.15fr 1fr; align-items:start;">
+    <div>
+      <table style="font-size:17px;">
+        <thead><tr><th>打ち方</th><th class="n">報告CV</th><th class="n">実純増</th><th class="n">接触</th><th class="n">実CPA</th></tr></thead>
+        <tbody>
+          <tr><td>値引き × 全員配信</td><td class="n">4</td><td class="n">1</td><td class="n">62</td><td class="n">62.0</td></tr>
+          <tr><td>値引き × 絞り込み</td><td class="n">4</td><td class="n">1</td><td class="n">19</td><td class="n">19.0</td></tr>
+          <tr><td>品質 × 全員配信</td><td class="n">4</td><td class="n">1</td><td class="n">56</td><td class="n">56.0</td></tr>
+          <tr><td>品質 × 絞り込み</td><td class="n">4</td><td class="n">1</td><td class="n">17</td><td class="n">17.0</td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:19px; margin-top:18px;">
+        報告される <strong>4件</strong> の内訳は
+        <span class="chip" style="background:var(--new)"></span>NEW 2 ／
+        <span class="chip" style="background:var(--ghost)"></span>GHOST 2。
+        さらに <span class="chip" style="background:var(--lost)"></span>LOST 1 は報告されない。
+      </p>
+      <p class="big" style="margin-top:6px;">4.00<span style="font-size:34px">倍</span></p>
+      <p class="big sub">見かけのCVは、実際の純増の4倍だった</p>
+    </div>
+    <div>
+      <h3 style="font-size:21px; margin:0 0 12px;">広告は需要を作らず、前倒しして棚を空にした</h3>
+      <table style="font-size:17px;">
+        <tr><td>広告なし</td><td>brandco 在庫 4 → <strong>1</strong>（売り切れない）</td></tr>
+        <tr><td>広告あり</td><td>brandco 在庫 4 → <strong>0</strong>（step 13 で完売）</td></tr>
+      </table>
+      <p style="font-size:18px; margin-top:16px;">同じ人物 agent 10 の軌跡:</p>
+      <div style="font-family:ui-monospace,monospace; font-size:15.5px; line-height:1.7;
+                  background:#f6f8fb; border-radius:10px; padding:14px 16px;">
+        広告なし　step12 到着・在庫2 → <strong>step13 購入</strong><br>
+        広告あり　step12 到着・在庫0 → step24 まで<strong>買えず</strong>
+      </div>
+      <p style="font-size:17px; color:var(--muted); margin-top:14px;">
+        広告が他人の購買を早め、棚を空にし、本来買うはずだった人が買えなくなった。
+        これが LOST であり、広告プラットフォームには決して現れない。
+      </p>
+    </div>
+  </div>
+  <p style="font-size:15px; color:var(--muted); margin:auto 0 0;">
+    seed 44・消費者12人・24ステップ・1試行。広告前の双子ランがログレベルで同一であることを検証済みの実行のみ掲載。
+  </p>
   <div class="pagenum">6</div>
 </div>
 
