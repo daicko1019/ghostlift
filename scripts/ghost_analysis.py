@@ -103,8 +103,21 @@ def summarise(control_dir: str, treated_dir: str, brand: str, cpi: float) -> Dic
     # minus the ones the campaign cost it.
     incremental_brand = len(buckets["new"]) + len(buckets["stolen"]) - len(buckets["lost"])
 
-    # What the market gained: stolen sales are a transfer, not new demand.
-    incremental_market = len(buckets["new"]) - len(buckets["lost"])
+    # What the market gained. This has to come from the actual totals, not from
+    # the brand's buckets: a campaign can pull people towards a shelf that then
+    # empties, and those people may buy nowhere at all. Counting only the
+    # brand's own gains and losses misses them entirely, which is what an
+    # earlier version of this script did.
+    total_control = sum(1 for p in purchases_by_agent(control).values() if p)
+    total_treated = sum(1 for p in purchases_by_agent(treated).values() if p)
+    incremental_market = total_treated - total_control
+
+    # Sales the other shops lost. Nobody reports these either, and for a
+    # campaign that empties its own shelf they can dwarf the brand's gain.
+    others_control = total_control - sum(
+        1 for p in purchases_by_agent(control).values() if p == brand)
+    others_treated = total_treated - sum(
+        1 for p in purchases_by_agent(treated).values() if p == brand)
 
     spend = treated["impressions_cum"] * cpi
 
@@ -124,6 +137,8 @@ def summarise(control_dir: str, treated_dir: str, brand: str, cpi: float) -> Dic
         "ghost_multiple": (attributed / incremental_brand) if incremental_brand > 0 else None,
         "reported_cpa": (spend / attributed) if attributed else None,
         "true_cpa": (spend / incremental_brand) if incremental_brand > 0 else None,
+        "other_sales_control": others_control,
+        "other_sales_treated": others_treated,
         "brand_sales_control": sum(1 for p in purchases_by_agent(control).values() if p == brand),
         "brand_sales_treated": sum(1 for p in purchases_by_agent(treated).values() if p == brand),
         "total_sales_control": sum(1 for p in purchases_by_agent(control).values() if p),
@@ -148,7 +163,12 @@ def print_report(s: Dict) -> None:
     print(f"    LOST   sales the campaign destroyed : {len(b['lost']):>2}  agents {b['lost']}")
     print()
     print(f"  True incremental sales for the brand  : {s['incremental_brand']}")
-    print(f"  True incremental demand for the market: {s['incremental_market']}")
+    print(f"  Sales at every other shop             : "
+          f"{s['other_sales_control']} -> {s['other_sales_treated']} "
+          f"({s['other_sales_treated'] - s['other_sales_control']:+d})")
+    print(f"  Purchases in the whole market         : "
+          f"{s['total_sales_control']} -> {s['total_sales_treated']} "
+          f"({s['incremental_market']:+d})")
     if s["ghost_multiple"] is not None:
         print(f"  Reported / real                       : {s['ghost_multiple']:.2f}x")
     else:

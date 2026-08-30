@@ -1,4 +1,4 @@
-# discount creative x target targeting.
+# quality creative x broad targeting.
 # Identical to scenario_noad.yaml except for the ad_campaigns block below.
 
 seed: 43  # Same seed in all scenarios => the same 8 people, same starting spots
@@ -68,14 +68,13 @@ places:
     price: 4
 
 ad_campaigns:
-  - name: "discount_target"
+  - name: "quality_broad"
     sponsor: "BrandCo"
-    copy: "BrandCo tote, 20% off this week only. Stock is limited."
+    copy: "BrandCo tote. Hand-finished leather, made to last ten years."
     place: "brandco"        # what the ad links to; a click lands here
     start_step: 4
     end_step: 9
-    targeting: in_market    # Only agents already close to buying
-    targeting_radius: 5
+    targeting: all          # Untargeted: everyone an impression can reach
 
 llm:
   model: "qwen3:4b-instruct-2507-q4_K_M"
@@ -92,8 +91,8 @@ llm:
 visualization:
   save_frames: true
   frame_interval: 1
-  output_dir: "output_discount_target_s43"
+  output_dir: "output_quality_broad_s43"
 
 logging:
   level: "INFO"
-  log_file: "simulation_discount_target_s43.log"
+  log_file: "simulation_quality_broad_s43.log"
