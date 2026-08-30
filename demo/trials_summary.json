@@ -1,0 +1,157 @@
+{
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "campaigns": {
+    "/Users/digi/Projects/ghostlift/discount_broad": {
+      "trials": 3,
+      "buckets": {
+        "new": [
+          1,
+          0,
+          1
+        ],
+        "stolen": [
+          0,
+          1,
+          0
+        ],
+        "ghost": [
+          3,
+          1,
+          3
+        ],
+        "lost": [
+          0,
+          3,
+          1
+        ]
+      },
+      "attributed_cv": [
+        4,
+        2,
+        4
+      ],
+      "incremental_brand": [
+        1,
+        -2,
+        0
+      ],
+      "ghost_multiple": [
+        4.0
+      ]
+    },
+    "/Users/digi/Projects/ghostlift/discount_target": {
+      "trials": 3,
+      "buckets": {
+        "new": [
+          2,
+          0,
+          0
+        ],
+        "stolen": [
+          0,
+          0,
+          1
+        ],
+        "ghost": [
+          2,
+          1,
+          3
+        ],
+        "lost": [
+          1,
+          3,
+          1
+        ]
+      },
+      "attributed_cv": [
+        4,
+        1,
+        4
+      ],
+      "incremental_brand": [
+        1,
+        -3,
+        0
+      ],
+      "ghost_multiple": [
+        4.0
+      ]
+    },
+    "/Users/digi/Projects/ghostlift/quality_broad": {
+      "trials": 3,
+      "buckets": {
+        "new": [
+          0,
+          0,
+          0
+        ],
+        "stolen": [
+          0,
+          1,
+          0
+        ],
+        "ghost": [
+          3,
+          3,
+          2
+        ],
+        "lost": [
+          0,
+          1,
+          2
+        ]
+      },
+      "attributed_cv": [
+        3,
+        4,
+        2
+      ],
+      "incremental_brand": [
+        0,
+        0,
+        -2
+      ],
+      "ghost_multiple": []
+    },
+    "/Users/digi/Projects/ghostlift/quality_target": {
+      "trials": 3,
+      "buckets": {
+        "new": [
+          1,
+          0,
+          0
+        ],
+        "stolen": [
+          0,
+          1,
+          2
+        ],
+        "ghost": [
+          1,
+          2,
+          2
+        ],
+        "lost": [
+          2,
+          2,
+          2
+        ]
+      },
+      "attributed_cv": [
+        2,
+        3,
+        4
+      ],
+      "incremental_brand": [
+        -1,
+        -1,
+        0
+      ],
+      "ghost_multiple": []
+    }
+  }
+}

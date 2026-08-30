@@ -5,6 +5,8 @@ import argparse
 import logging
 import os
 import shutil
+import sys
+import time
 from typing import Optional, Tuple
 from simulation import Simulation
 from utils import load_config
@@ -40,6 +42,15 @@ def check_ollama_setup(sim: Simulation, logger: logging.Logger) -> bool:
     # One request answers both questions: whether the server is reachable and
     # which models it has. None means unreachable, [] means reachable but empty.
     available_models = client.fetch_models()
+
+    # One dropped probe over a private network should not discard a run that
+    # costs many minutes of GPU time, so give the server a couple of chances.
+    for attempt in range(4):
+        if available_models is not None:
+            break
+        time.sleep(5)
+        logger.warning(f"Ollama not reachable, retrying ({attempt + 1}/4)")
+        available_models = client.fetch_models()
 
     if available_models is None:
         logger.error("Cannot connect to Ollama. Please make sure Ollama is running.")
@@ -174,7 +185,7 @@ def run_simulation(
     sim.initialize_agents()
 
     if not check_ollama_setup(sim, logger):
-        return
+        raise RuntimeError(f"Ollama unreachable or model missing at {sim.llm_client.base_url}")
 
     # Save the initial state (step 0) before the first LLM step. One step costs
     # one LLM call per agent twice over, so it can take minutes; without this
@@ -225,8 +236,13 @@ def main():
         run_simulation(sim, visualizer, frame_interval, output_dir, logger)
     except KeyboardInterrupt:
         logger.info("Simulation interrupted by user")
+        sys.exit(130)
     except Exception as e:
         logger.error(f"Error during simulation: {e}", exc_info=True)
+        # Exit non-zero so a batch runner cannot mistake an empty run for a
+        # finished one. A seed whose control run silently produced nothing
+        # cannot be decomposed, and that must not pass unnoticed.
+        sys.exit(1)
 
 
 if __name__ == "__main__":

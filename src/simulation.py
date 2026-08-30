@@ -112,6 +112,9 @@ class Simulation:
         # perceived by distance; an ad is delivered by targeting.
         self.ad_configs: List[Dict] = self.config.get('ad_campaigns', [])
         self.impressions = 0  # Cumulative ad impressions (the thing you pay for)
+        self.clicks = 0       # Cumulative click-throughs (the creative's first effect)
+        self.searches = 0     # Cumulative organic arrivals (the channel an ad can cannibalise)
+        self.mutes = 0        # Cumulative opt-outs (what over-exposure costs)
         self.ads_delivered_this_step: List[Dict] = []
         for ac in self.ad_configs:
             logger.info(
@@ -123,6 +126,9 @@ class Simulation:
         # Budgets are handed out from the config in order so that the same
         # seed produces the same population in every scenario
         self.budgets: List[int] = agent_config.get('budgets', [])
+        self.personas: List[str] = agent_config.get('personas', [])
+        self.relations: List[List[int]] = agent_config.get('relations', [])
+        self.active_from: List[int] = agent_config.get('active_from', [])
 
         # LLM parameters
         llm_config = self.config['llm']
@@ -210,6 +216,9 @@ class Simulation:
             "step": self.step,
             "stock": dict(self.stock),
             "impressions_cum": self.impressions,
+            "clicks_cum": self.clicks,
+            "searches_cum": self.searches,
+            "mutes_cum": self.mutes,
             "purchases_cum": len(self.purchases),
             "ads_delivered": self.ads_delivered_this_step,
             "agents": [
@@ -219,6 +228,12 @@ class Simulation:
                     "place": a.current_place,
                     "budget": a.budget,
                     "ads_seen": len(a.ads_seen),
+                    "clicks": a.clicks,
+                    "searches": a.searches,
+                    "muted": a.muted,
+                    "intent": a.intent,
+                    "heard_of": sorted(a.heard_places),
+                    "in_market": self.step >= a.active_from,
                     "purchased_at": a.purchased_at,
                     "purchase_place": a.purchase_place,
                 }
@@ -251,8 +266,9 @@ class Simulation:
             raise ValueError(f"Unknown targeting mode: {targeting}")
 
         # Nobody keeps paying to advertise a durable good to someone who has
-        # already bought it, so converted agents are excluded from delivery
-        return [a for a in candidates if a.purchased_at is None]
+        # already bought it, and a muted agent cannot be reached at any price.
+        # The second exclusion is what gives over-exposure a real cost.
+        return [a for a in candidates if a.purchased_at is None and not a.muted]
 
     def _deliver_ads(self) -> None:
         """Deliver every campaign active on this step and bill the impressions."""
@@ -269,7 +285,10 @@ class Simulation:
                     'step': self.step,
                     'sponsor': ad.get('sponsor', ad.get('name', 'advertiser')),
                     'copy': ad['copy'],
+                    'place': ad.get('place'),
                 })
+                if ad.get('place'):
+                    agent.ad_places.add(ad['place'])
             self.impressions += len(recipients)
             self.ads_delivered_this_step.append({
                 'name': ad.get('name'),
@@ -281,6 +300,77 @@ class Simulation:
                     f"{len(recipients)} agent(s): {[a.id for a in recipients]}"
                 )
 
+    def _try_click(self, agent: Agent) -> bool:
+        """Follow an ad: land inside the advertised place in one step.
+
+        This is the ad's own causal channel. Walking the grid is what someone
+        does who was already heading that way; clicking is what an ad buys.
+        Keeping them separate is what lets the decomposition say whether a
+        conversion came from the campaign or would have walked in regardless.
+        """
+        if agent.purchased_at is not None or not agent.ad_places:
+            return False
+
+        # An agent that saw ads for several places follows the most recent one
+        target = next((ad.get('place') for ad in reversed(agent.ads_seen) if ad.get('place')), None)
+        if not target:
+            return False
+
+        place = next((p for p in self.places if p['name'] == target), None)
+        if place is None:
+            return False
+
+        agent.position = (place['center_x'], place['center_y'])
+        agent.clicks += 1
+        self.clicks += 1
+        logger.info(
+            f"Step {self.step}: Agent {agent.id} clicked through to {target} "
+            f"(total clicks {self.clicks})"
+        )
+        return True
+
+    def _try_search(self, agent: Agent) -> bool:
+        """Go looking for a shop heard about through word of mouth.
+
+        The organic counterpart of the click. An advertised world can convert
+        the same person through the paid route instead, and the platform then
+        books a conversion that would have arrived on its own - which is
+        exactly what the decomposition is built to expose.
+        """
+        if agent.purchased_at is not None or not agent.heard_places:
+            return False
+
+        # Searching your way to the shop you are already standing in is a
+        # no-op that an agent can repeat forever, so the current place is not
+        # a candidate. Leaving it in produced agents that searched their way
+        # into the same shop every step instead of deciding anything.
+        known = [p for p in self.places
+                 if p['name'] in agent.heard_places and p['name'] != agent.current_place]
+        if not known:
+            return False
+
+        target = min(known, key=lambda p: agent.distance_to((p['center_x'], p['center_y'])))
+        agent.position = (target['center_x'], target['center_y'])
+        agent.searches += 1
+        self.searches += 1
+        logger.info(
+            f"Step {self.step}: Agent {agent.id} searched its way to {target['name']} "
+            f"(total organic arrivals {self.searches})"
+        )
+        return True
+
+    def _try_mute(self, agent: Agent) -> bool:
+        """Opt out of the advertiser. Frequency has a ceiling and this is it."""
+        if agent.muted or not agent.ads_seen:
+            return False
+        agent.muted = True
+        self.mutes += 1
+        logger.info(
+            f"Step {self.step}: Agent {agent.id} muted the advertiser after "
+            f"{len(agent.ads_seen)} impressions (total mutes {self.mutes})"
+        )
+        return True
+
     def _try_purchase(self, agent: Agent) -> bool:
         """Execute a "buy" action if the world allows it.
 
@@ -288,7 +378,7 @@ class Simulation:
         comparable to its twin agent by agent: each agent either converted or
         did not.
         """
-        if agent.purchased_at is not None:
+        if agent.purchased_at is not None or self.step < agent.active_from:
             return False
         if not agent.in_place or not agent.current_place:
             return False
@@ -373,6 +463,9 @@ class Simulation:
         for i in range(self.num_agents):
             gender = random.choice(["male", "female"])
             budget = self.budgets[i % len(self.budgets)] if self.budgets else 0
+            persona = self.personas[i % len(self.personas)] if self.personas else ""
+            relations = self.relations[i] if i < len(self.relations) else []
+            active_from = self.active_from[i] if i < len(self.active_from) else 1
             agent = Agent(
                 agent_id=i,
                 initial_position=positions[i],
@@ -383,6 +476,9 @@ class Simulation:
                 num_agents=self.num_agents,
                 gender=gender,
                 budget=budget,
+                persona=persona,
+                relations=relations,
+                active_from=active_from,
                 memory_limit=self.memory_limit,
                 memory_size=self.memory_size,
                 message_history_limit=self.message_history_limit,
@@ -534,6 +630,7 @@ class Simulation:
                 )
                 for other_agent in nearby_agents:
                     other_agent.receive_message(agent.id, message_content, step=self.step)
+                    other_agent.note_places_mentioned(message_content)
                     # Log message to jsonl file
                     self._log_message(
                         from_agent_id=agent.id,
@@ -569,8 +666,17 @@ class Simulation:
         # Phase 4: Execute movement and purchases
         for agent, action_decision in action_decisions:
             action = action_decision['action']
+            if action_decision.get('intent') is not None:
+                agent.intent = action_decision['intent']
+
             if action == 'buy':
                 self._try_purchase(agent)
+            elif action == 'click':
+                self._try_click(agent)
+            elif action == 'search':
+                self._try_search(agent)
+            elif action == 'mute':
+                self._try_mute(agent)
             elif action == 'move' and action_decision['direction']:
                 agent.move(action_decision['direction'])
 

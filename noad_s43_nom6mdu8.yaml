@@ -1,7 +1,7 @@
 # The counterfactual world. Nobody advertises anything.
 # Every other scenario is measured against this one, agent by agent.
 
-seed: 42  # Same seed in all scenarios => the same 8 people, same starting spots
+seed: 43  # Same seed in all scenarios => the same 8 people, same starting spots
 
 simulation:
   duration: 24
@@ -73,7 +73,7 @@ llm:
   model: "qwen3:4b-instruct-2507-q4_K_M"
   base_url: "http://localhost:11434"
   temperature: 0.2
-  seed: 42
+  seed: 43
   think: false
   max_tokens: 512
   timeout: 300
@@ -84,8 +84,8 @@ llm:
 visualization:
   save_frames: true
   frame_interval: 1
-  output_dir: "output_noad"
+  output_dir: "output_noad_s43"
 
 logging:
   level: "INFO"
-  log_file: "simulation_noad.log"
+  log_file: "simulation_noad_s43.log"

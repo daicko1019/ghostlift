@@ -1,0 +1,159 @@
+[
+  {
+    "control_dir": "/Users/digi/Projects/ghostlift/output_noad_s43",
+    "treated_dir": "/Users/digi/Projects/ghostlift/output_discount_broad_s43",
+    "brand": "brandco",
+    "buckets": {
+      "new": [
+        8,
+        10
+      ],
+      "stolen": [],
+      "ghost": [
+        2
+      ],
+      "lost": [
+        4
+      ],
+      "untouched": [
+        0,
+        1,
+        3,
+        5,
+        6,
+        7,
+        9,
+        11
+      ]
+    },
+    "attributed_cv": 3,
+    "incremental_brand": 1,
+    "incremental_market": 1,
+    "impressions": 52,
+    "spend": 52.0,
+    "ghost_multiple": 3.0,
+    "reported_cpa": 17.333333333333332,
+    "true_cpa": 52.0,
+    "brand_sales_control": 2,
+    "brand_sales_treated": 3,
+    "total_sales_control": 7,
+    "total_sales_treated": 8
+  },
+  {
+    "control_dir": "/Users/digi/Projects/ghostlift/output_noad_s43",
+    "treated_dir": "/Users/digi/Projects/ghostlift/output_discount_target_s43",
+    "brand": "brandco",
+    "buckets": {
+      "new": [
+        3,
+        9
+      ],
+      "stolen": [],
+      "ghost": [
+        2,
+        4
+      ],
+      "lost": [],
+      "untouched": [
+        0,
+        1,
+        5,
+        6,
+        7,
+        8,
+        10,
+        11
+      ]
+    },
+    "attributed_cv": 4,
+    "incremental_brand": 2,
+    "incremental_market": 2,
+    "impressions": 15,
+    "spend": 15.0,
+    "ghost_multiple": 2.0,
+    "reported_cpa": 3.75,
+    "true_cpa": 7.5,
+    "brand_sales_control": 2,
+    "brand_sales_treated": 4,
+    "total_sales_control": 7,
+    "total_sales_treated": 9
+  },
+  {
+    "control_dir": "/Users/digi/Projects/ghostlift/output_noad_s43",
+    "treated_dir": "/Users/digi/Projects/ghostlift/output_quality_broad_s43",
+    "brand": "brandco",
+    "buckets": {
+      "new": [
+        8,
+        9
+      ],
+      "stolen": [],
+      "ghost": [
+        2,
+        4
+      ],
+      "lost": [],
+      "untouched": [
+        0,
+        1,
+        3,
+        5,
+        6,
+        7,
+        10,
+        11
+      ]
+    },
+    "attributed_cv": 4,
+    "incremental_brand": 2,
+    "incremental_market": 2,
+    "impressions": 50,
+    "spend": 50.0,
+    "ghost_multiple": 2.0,
+    "reported_cpa": 12.5,
+    "true_cpa": 25.0,
+    "brand_sales_control": 2,
+    "brand_sales_treated": 4,
+    "total_sales_control": 7,
+    "total_sales_treated": 9
+  },
+  {
+    "control_dir": "/Users/digi/Projects/ghostlift/output_noad_s43",
+    "treated_dir": "/Users/digi/Projects/ghostlift/output_quality_target_s43",
+    "brand": "brandco",
+    "buckets": {
+      "new": [
+        8
+      ],
+      "stolen": [],
+      "ghost": [
+        2,
+        4
+      ],
+      "lost": [],
+      "untouched": [
+        0,
+        1,
+        3,
+        5,
+        6,
+        7,
+        9,
+        10,
+        11
+      ]
+    },
+    "attributed_cv": 3,
+    "incremental_brand": 1,
+    "incremental_market": 1,
+    "impressions": 19,
+    "spend": 19.0,
+    "ghost_multiple": 3.0,
+    "reported_cpa": 6.333333333333333,
+    "true_cpa": 19.0,
+    "brand_sales_control": 2,
+    "brand_sales_treated": 3,
+    "total_sales_control": 7,
+    "total_sales_treated": 8
+  }
+]

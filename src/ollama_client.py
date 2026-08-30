@@ -17,6 +17,7 @@ DEFAULT_REPEAT_PENALTY = 1.1
 DEFAULT_REPEAT_LAST_N = 128
 DEFAULT_MIN_P = 0.05
 DEFAULT_SEED = None  # None = sampler stays random, as upstream
+DEFAULT_KEEP_ALIVE = "4h"  # Keep the model resident; a cold reload breaks twin runs
 DEFAULT_THINK = None  # None = leave the model's own thinking default untouched
 DEFAULT_TIMEOUT_SECONDS = 60  # Read timeout for one /api/generate call [s]
 CONNECTION_CHECK_TIMEOUT = 5
@@ -35,6 +36,7 @@ class OllamaClient:
         repeat_last_n: int = DEFAULT_REPEAT_LAST_N,
         min_p: float = DEFAULT_MIN_P,
         seed: Optional[int] = DEFAULT_SEED,
+        keep_alive: str = DEFAULT_KEEP_ALIVE,
         think: Optional[bool] = DEFAULT_THINK,
         timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
     ):
@@ -46,6 +48,7 @@ class OllamaClient:
         self.repeat_last_n = repeat_last_n
         self.min_p = min_p
         self.seed = seed
+        self.keep_alive = keep_alive
         self.think = think
         self.timeout_seconds = timeout_seconds
         self.api_url = f"{self.base_url}/api/generate"
@@ -75,6 +78,15 @@ class OllamaClient:
         # server. Omitted when unset so upstream behaviour is unchanged.
         if self.seed is not None:
             payload["options"]["seed"] = self.seed
+
+        # Pin the model in memory for the length of the run. A model that gets
+        # evicted between two calls comes back cold, and a cold model generates
+        # different messages and memories from a resident one - which silently
+        # splits twin runs apart before the ad ever lands. Relying on the
+        # server's environment for this proved unreliable: one of our three
+        # nodes had OLLAMA_KEEP_ALIVE set after the server had already started,
+        # so it was never picked up.
+        payload["keep_alive"] = self.keep_alive
 
         # Thinking models (qwen3, gpt-oss, ...) return their reasoning in a
         # separate "thinking" field that this client never reads, yet those

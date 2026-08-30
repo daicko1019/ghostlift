@@ -26,7 +26,9 @@ import sys
 import tempfile
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SCENARIOS = ["noad", "broadcast", "retarget"]
+CONTROL = "noad"
+SCENARIOS = [CONTROL, "discount_broad", "discount_target",
+             "quality_broad", "quality_target"]
 
 
 def warm_up(url: str = None) -> None:
@@ -128,10 +130,18 @@ def run_one(job: tuple) -> tuple:
 
 
 def analyse(seed, out_dirs: dict) -> None:
+    """Compare every advertised run against the control run of the same seed."""
+    if CONTROL not in out_dirs:
+        print(f"seed {seed}: no control run, cannot decompose")
+        return
+    treated = [out_dirs[k] for k in SCENARIOS if k != CONTROL and k in out_dirs]
+    if not treated:
+        return
+
     suffix = "" if seed is None else f"_s{seed}"
     cmd = [
         venv_python(), os.path.join(REPO, "scripts", "ghost_analysis.py"),
-        out_dirs["noad"], out_dirs["broadcast"], out_dirs["retarget"],
+        out_dirs[CONTROL], *treated,
         "--json-out", os.path.join(REPO, "demo", f"ghost_summary{suffix}.json"),
         "-o", os.path.join(REPO, "demo", f"ghost_decomposition{suffix}.png"),
     ]
@@ -185,8 +195,8 @@ def main() -> None:
     os.makedirs(os.path.join(REPO, "demo"), exist_ok=True)
     for seed in seeds:
         out_dirs = {sc: od for sc, sd, _, od in results if sd == seed}
-        if len(out_dirs) < 3:
-            print(f"seed {seed}: need all three scenarios to decompose, skipping")
+        if CONTROL not in out_dirs or len(out_dirs) < 2:
+            print(f"seed {seed}: need the control plus at least one campaign, skipping")
             continue
         analyse(seed, out_dirs)
 

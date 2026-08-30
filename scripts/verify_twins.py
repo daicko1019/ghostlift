@@ -28,10 +28,11 @@ TRACKED = ["metrics.jsonl", "messages.jsonl", "memory_reasoning.jsonl"]
 # Not every logged field is part of the world. Only two of the LLM's outputs are
 # ever read again: the message, which is delivered to nearby agents, and the
 # memory, which the agent carries into its own next prompt. "reasoning" is
-# written to the log and never looked at again, so two runs whose reasoning
-# differs but whose messages, memories and state match are the same world with
-# two different write-ups of it - which does not invalidate any comparison.
-LOG_ONLY_FIELDS = {"reasoning"}
+# written to the log and never looked at again, and "intent" is a reading we
+# take from the agent that is never shown back to it. Two runs that differ only
+# in these are the same world with two different write-ups of it, which does
+# not invalidate any comparison.
+LOG_ONLY_FIELDS = {"reasoning", "intent"}
 
 
 def load(output_dir: str, name: str) -> List[Dict]:
@@ -47,7 +48,21 @@ def before(records: List[Dict], step: int) -> List[Dict]:
 
 
 def strip_log_only(records: List[Dict]) -> List[Dict]:
-    return [{k: v for k, v in r.items() if k not in LOG_ONLY_FIELDS} for r in records]
+    """Drop the log-only fields, including the ones nested inside "agents".
+
+    Stripping only the top level let a per-agent reading like intent fail the
+    check even though nothing in the world ever reads it.
+    """
+    out = []
+    for r in records:
+        clean = {k: v for k, v in r.items() if k not in LOG_ONLY_FIELDS}
+        if isinstance(clean.get("agents"), list):
+            clean["agents"] = [
+                {k: v for k, v in a.items() if k not in LOG_ONLY_FIELDS}
+                for a in clean["agents"]
+            ]
+        out.append(clean)
+    return out
 
 
 def log_only_differs(a: List[Dict], b: List[Dict]) -> bool:

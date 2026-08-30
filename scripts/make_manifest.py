@@ -10,7 +10,38 @@ import os
 import re
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PATTERN = re.compile(r"^output_(?P<scenario>[a-z]+)(?:_s(?P<seed>\d+))?$")
+PATTERN = re.compile(r"^output_(?P<scenario>[a-z_]+?)(?:_s(?P<seed>\d+))?$")
+
+
+def world_from_scenario() -> dict:
+    """Read the field and the shops out of the scenario file.
+
+    The dashboard cannot parse YAML, and hard-coding the geometry there means
+    it silently draws the wrong world the moment the scenario is retuned -
+    which it was, several times.
+    """
+    path = os.path.join(REPO, "scenario_noad.yaml")
+    if not os.path.exists(path):
+        return {}
+    try:
+        import yaml
+        with open(path, encoding="utf-8") as f:
+            cfg = yaml.safe_load(f)
+    except Exception:
+        return {}
+
+    return {
+        "half_space_size": cfg.get("simulation", {}).get("half_space_size"),
+        "duration": cfg.get("simulation", {}).get("duration"),
+        "num_agents": cfg.get("agents", {}).get("num_agents"),
+        "places": [
+            {
+                "name": p["name"], "center_x": p["center_x"], "center_y": p["center_y"],
+                "half_size": p["half_size"], "stock": p.get("stock"), "price": p.get("price"),
+            }
+            for p in cfg.get("places", [])
+        ],
+    }
 
 
 def steps_in(path: str) -> int:
@@ -51,7 +82,8 @@ def main() -> None:
     out = os.path.join(REPO, "demo", "runs.json")
     os.makedirs(os.path.dirname(out), exist_ok=True)
     with open(out, "w", encoding="utf-8") as f:
-        json.dump({"runs": runs, "pairs": pairs}, f, ensure_ascii=False, indent=2)
+        json.dump({"world": world_from_scenario(), "runs": runs, "pairs": pairs},
+                  f, ensure_ascii=False, indent=2)
 
     print(f"Wrote {out}: {len(runs)} run(s), {len(pairs)} comparable pair(s)")
     for p in pairs:

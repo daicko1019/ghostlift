@@ -1,5 +1,5 @@
-# The counterfactual world. Nobody advertises anything.
-# Every other scenario is measured against this one, agent by agent.
+# discount creative x broad targeting.
+# Identical to scenario_noad.yaml except for the ad_campaigns block below.
 
 seed: 42  # Same seed in all scenarios => the same 8 people, same starting spots
 
@@ -67,7 +67,14 @@ places:
     stock: 5
     price: 4
 
-# No ad_campaigns block at all.
+ad_campaigns:
+  - name: "discount_broad"
+    sponsor: "BrandCo"
+    copy: "BrandCo tote, 20% off this week only. Stock is limited."
+    place: "brandco"        # what the ad links to; a click lands here
+    start_step: 4
+    end_step: 9
+    targeting: all          # Untargeted: everyone an impression can reach
 
 llm:
   model: "qwen3:4b-instruct-2507-q4_K_M"
@@ -84,8 +91,8 @@ llm:
 visualization:
   save_frames: true
   frame_interval: 1
-  output_dir: "output_noad"
+  output_dir: "output_discount_broad"
 
 logging:
   level: "INFO"
-  log_file: "simulation_noad.log"
+  log_file: "simulation_discount_broad.log"

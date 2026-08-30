@@ -4,7 +4,7 @@ LLM-based agent in 2D worlds with multiple places.
 import json
 import math
 import logging
-from typing import List, Tuple, Optional, Dict, TypedDict
+from typing import List, Tuple, Optional, Dict, Set, TypedDict
 from ollama_client import OllamaClient
 from utils import get_place_at_position, PlaceConfig
 
@@ -14,6 +14,19 @@ logger = logging.getLogger(__name__)
 FALLBACK_REASONING_LENGTH = 100
 MAX_MESSAGE_WORDS = 200
 AD_CONTEXT_SIZE = 3  # Most recent ad impressions shown in the prompt
+
+
+def _coerce_intent(value) -> Optional[int]:
+    """Keep the self-report to 0-100, or None when the model did not give one.
+
+    This number is logged and never read by any rule. Letting it drive
+    behaviour would mean writing the answer - "more impressions, more desire" -
+    into the simulator and then observing our own assumption.
+    """
+    try:
+        return max(0, min(100, int(float(value))))
+    except (TypeError, ValueError):
+        return None
 
 # Direction mappings (4 cardinal directions only)
 # Coordinate system: X increases from left to right, Y increases from bottom to top
@@ -33,10 +46,11 @@ class MessageDecision(TypedDict):
 
 class ActionDecision(TypedDict):
     """Type definition for agent action decision"""
-    action: str  # "move", "stay" or "buy"
+    action: str  # "move", "stay", "buy", "click", "search" or "mute"
     direction: Optional[str]  # Direction to move (None if action is "stay")
     memory: str  # What the agent wants to remember for the next step
     reasoning: str  # Explanation of the decision
+    intent: Optional[int]  # Self-reported 0-100 desire to buy. Observed, never acted on
 
 
 class Agent:
@@ -53,6 +67,9 @@ class Agent:
         num_agents: int,
         gender: str = "male",
         budget: int = 0,
+        persona: str = "",
+        relations: Optional[List[int]] = None,
+        active_from: int = 1,
         memory_limit: int = 20,
         memory_size: int = 5,
         message_history_limit: int = 10,
@@ -67,6 +84,16 @@ class Agent:
         self.num_agents = num_agents
         self.gender = gender
         self.budget = budget  # Numeric only; whether it is "enough" is the LLM's call
+        # A disposition, not an instruction. Which creative it warms to is the
+        # LLM's call; without any disposition at all, two creatives can only
+        # differ by sampling noise and the comparison measures nothing.
+        self.persona = persona
+        # Who this agent already knows. Whether a familiar voice carries more
+        # weight than a stranger's is, again, left to the LLM.
+        self.relations = set(relations or [])
+        # Not everyone is shopping on day one. Staggering who is in the market
+        # is what leaves the campaign anyone to influence.
+        self.active_from = active_from
 
         # Memory parameters
         self.memory_limit = memory_limit  # Maximum memories to store
@@ -82,6 +109,12 @@ class Agent:
         self.purchased_at: Optional[int] = None  # Step of this agent's purchase (None = has not bought)
         self.purchase_place: Optional[str] = None  # Where it bought
         self.ads_seen: List[Dict] = []  # Ad impressions delivered to this agent
+        self.ad_places: Set[str] = set()  # Places the ads this agent saw point at
+        self.clicks = 0  # How many times this agent followed an ad
+        self.searches = 0  # How many times it went looking on its own
+        self.muted = False  # Opted out of this advertiser's impressions
+        self.intent: Optional[int] = None  # Latest self-reported desire to buy
+        self.heard_places: Set[str] = set()  # Places it has heard of through word of mouth
 
 
     def is_in_place(self, position: Tuple[int, int]) -> bool:
@@ -169,7 +202,9 @@ class Agent:
         
         recent_messages = self.received_messages[-self.message_context_size:]
         return "\n".join([
-            f"from Agent {msg['from']}: {msg['content']}"
+            f"from Agent {msg['from']}"
+            f"{' (someone you know)' if msg['from'] in self.relations else ' (a stranger)'}"
+            f": {msg['content']}"
             for msg in recent_messages
         ])
     
@@ -194,19 +229,80 @@ class Agent:
             )
         return "\n".join(lines) + "\n"
 
+    def _build_extra_actions(self, step: int) -> str:
+        """Actions that only exist for agents in the right situation.
+
+        Click belongs to people an ad reached, search to people word of mouth
+        reached, mute to people who have had enough of the advertiser. Keeping
+        the paid and the organic route distinct is what lets the decomposition
+        say which one a conversion actually came through.
+        """
+        lines = []
+
+        ad_place = next(
+            (ad.get('place') for ad in reversed(self.ads_seen) if ad.get('place')), None)
+        # Before an agent is in the market it neither follows links nor goes
+        # looking; it can still be advertised at, and still walk around
+        can_act = self.purchased_at is None and step >= self.active_from
+
+        if can_act and ad_place and not self.muted:
+            lines.append(
+                f'- "click": follow the ad you were shown. This puts you inside '
+                f'{ad_place} on this step, wherever you are now.'
+            )
+
+        organic = sorted(p for p in self.heard_places if p != self.current_place)
+        if can_act and organic:
+            lines.append(
+                f'- "search": go looking for a shop you have heard of '
+                f'({", ".join(organic)}) and go to the nearest one. '
+                f'This puts you inside it on this step, wherever you are now.'
+            )
+
+        if self.ads_seen and not self.muted:
+            lines.append(
+                '- "mute": stop being shown this advertiser\'s messages. '
+                'You will receive no further ads from them for the rest of the run.'
+            )
+
+        return ("\n".join(lines) + "\n") if lines else ""
+
     def _build_stock_section(self, place_status: Optional[Dict]) -> str:
         """Stock and price of the place the agent is standing in.
 
         Follows the upstream rule for place information: numbers only, and only
         for agents who are actually inside. Someone outside the store cannot see
         how many are left, exactly as with occupancy.
+
+        When the purchase is actually possible, that is stated as the fact it
+        is. Left implicit, agents invent preconditions that do not exist - one
+        run produced an agent that decided purchases "require two agents to be
+        present", wrote that into its own memory, and stood in the shop for
+        eleven steps waiting for a colleague who was never coming. Stating the
+        available action closes that gap without telling anyone what to choose.
         """
         if not place_status or place_status.get('stock') is None:
             return ""
-        return (
-            f"\n  Units left in stock here: {place_status['stock']}"
-            f"\n  Price per unit: {place_status.get('price')}"
-        )
+
+        stock = place_status['stock']
+        price = place_status.get('price')
+        lines = [
+            f"\n  Units left in stock here: {stock}",
+            f"\n  Price per unit: {price}",
+        ]
+
+        if self.purchased_at is not None:
+            lines.append("\n  You have already bought this item.")
+        elif stock <= 0:
+            lines.append("\n  Nothing left to buy here.")
+        elif price is not None and self.budget < price:
+            lines.append(f"\n  Your budget of {self.budget} does not cover the price of {price}.")
+        else:
+            lines.append(
+                f"\n  A purchase here is possible on this step: price {price},"
+                f" your budget {self.budget}. No other condition applies."
+            )
+        return "".join(lines)
 
     def _build_ad_section(self) -> str:
         """Ad impressions this agent has received so far.
@@ -231,10 +327,26 @@ class Agent:
             bought = f"Yes, at step {self.purchased_at} in {self.purchase_place}"
         else:
             bought = "No"
-        return (
-            f"Budget you can spend: {self.budget}\n"
-            f"Already bought the item: {bought}"
-        )
+        lines = []
+        if self.persona:
+            lines.append(f"About you: {self.persona}")
+        lines += [
+            f"Budget you can spend: {self.budget}",
+            f"Already bought the item: {bought}",
+        ]
+        if self.ads_seen:
+            sponsors = sorted({ad.get('sponsor', 'an advertiser') for ad in self.ads_seen})
+            lines.append(
+                f"Times you have been shown {' and '.join(sponsors)}'s message: "
+                f"{len(self.ads_seen)}"
+            )
+        if self.muted:
+            lines.append("You have muted that advertiser; their messages no longer reach you.")
+        # Deliberately not shown back to the agent. It is a reading we take,
+        # not a state the world carries; feeding it back would both create a
+        # loop that amplifies any drift and quietly contradict the claim that
+        # nothing acts on it.
+        return "\n".join(lines)
 
     def _limit_message_words(self, message: str) -> str:
         """Check message word count and warn if exceeds MAX_MESSAGE_WORDS"""
@@ -294,11 +406,20 @@ class Agent:
         unique_types = list(set(place_types))
         world_description = f"a 2D world with multiple places ({', '.join(unique_types)})"
 
+        # The action prompt already names every place, but this one did not, so
+        # agents could only say "the store" and a name could never spread. Word
+        # of mouth is an acquisition channel here, and a channel that cannot
+        # carry a name carries nothing.
+        known_places = ", ".join(f"{p['name']} ({p['type']})" for p in self.places)
+
         fire_section = self._build_fire_section(fire_info)
         ad_section = self._build_ad_section()
         wallet_text = self._build_wallet_section()
 
         prompt = f"""You are Agent {self.id} ({self.gender}) in {world_description}.
+
+=== PLACES IN THIS WORLD ===
+{known_places}
 
 === YOUR CURRENT STATE ===
 Gender: {self.gender}
@@ -394,6 +515,7 @@ Step: {step}
         fire_section = self._build_fire_section(fire_info)
         ad_section = self._build_ad_section()
         wallet_text = self._build_wallet_section()
+        extra_actions = self._build_extra_actions(step)
 
         prompt = f"""You are Agent {self.id} ({self.gender}) in {world_description}.
 
@@ -419,17 +541,19 @@ In place: {"Yes" if self.in_place else "No"}
 {message_section}=== AVAILABLE ACTIONS ===
 - "stay": remain at current position
 - "move" with direction: "up" (Y+1), "down" (Y-1), "left" (X-1), "right" (X+1)
-- "buy": buy one unit of the item. Only possible while you are inside a place
-  that has stock left and whose price is within your budget. Ignored otherwise.
-
+- "buy": buy one unit of the item. Possible exactly when you are inside a place
+  that has stock left and whose price is within your budget, and you have not
+  already bought one. There are no other requirements. Ignored otherwise.
+{extra_actions}
 Field boundaries: X and Y from -{self.half_space_size} to +{self.half_space_size}
 
 === RESPOND IN JSON ===
 {{
-    "action": "move", "stay" or "buy",
+    "action": one of the actions listed above,
     "direction": "up", "down", "left", or "right" (only if action is "move"),
     "memory": "what you want to remember for the next step (your thoughts, observations, intentions)",
-    "reasoning": "brief explanation of your decision"
+    "reasoning": "brief explanation of your decision",
+    "intent": 0-100, how much you want to buy the item right now
 }}
 
 Step: {step}
@@ -529,7 +653,8 @@ Step: {step}
                     "action": parsed.get("action", "stay"),
                     "direction": parsed.get("direction"),
                     "memory": parsed.get("memory", ""),
-                    "reasoning": parsed.get("reasoning", "")
+                    "reasoning": parsed.get("reasoning", ""),
+                    "intent": _coerce_intent(parsed.get("intent")),
                 }
             except json.JSONDecodeError as e:
                 logger.debug(f"JSON parsing failed for response: {response[:100]}... Error: {e}")
@@ -540,9 +665,16 @@ Step: {step}
         memory = ""
         reasoning = response[:FALLBACK_REASONING_LENGTH]
 
-        if "buy" in response.lower():
+        lowered = response.lower()
+        if "mute" in lowered:
+            action = "mute"
+        elif "search" in lowered:
+            action = "search"
+        elif "click" in lowered:
+            action = "click"
+        elif "buy" in lowered:
             action = "buy"
-        elif "move" in response.lower():
+        elif "move" in lowered:
             action = "move"
             direction = self._extract_direction_from_text(response)
 
@@ -550,7 +682,8 @@ Step: {step}
             "action": action,
             "direction": direction,
             "memory": memory,
-            "reasoning": reasoning
+            "reasoning": reasoning,
+            "intent": None,
         }
     
     def decide_message(
@@ -600,7 +733,8 @@ Step: {step}
             return decision
         except Exception as e:
             logger.error(f"Error in agent {self.id} action decision: {e}")
-            return {"action": "stay", "direction": None, "memory": "", "reasoning": "Error occurred"}
+            return {"action": "stay", "direction": None, "memory": "",
+                    "reasoning": "Error occurred", "intent": None}
     
     def move(self, direction: str) -> Tuple[int, int]:
         """Move agent in specified direction (origin-centered coordinate system)"""
@@ -614,6 +748,19 @@ Step: {step}
         self.position = (new_x, new_y)
         return self.position
     
+    def note_places_mentioned(self, text: str) -> None:
+        """Record which shops this agent has now heard of.
+
+        Search is the organic counterpart of the click, and someone can only
+        look for a shop they know exists. Hearing its name in a neighbour's
+        message is how that knowledge spreads here, which turns word of mouth
+        from decoration into an actual acquisition channel.
+        """
+        lowered = (text or "").lower()
+        for place in self.places:
+            if place['name'].lower() in lowered:
+                self.heard_places.add(place['name'])
+
     def receive_message(self, from_agent_id: int, content: str, step: Optional[int] = None):
         """Receive a message from another agent
         

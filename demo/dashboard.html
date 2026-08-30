@@ -86,10 +86,10 @@
 <body>
 <header>
   <div class="wrap" style="padding-bottom:0">
-    <h1>GhostLift — the same eight people, with and without the ad</h1>
+    <h1 id="title">GhostLift — 同じ人たちを、広告のある世界とない世界で走らせる</h1>
     <div class="sub">
-      Both worlds share one seed, so agent 3 on the left is agent 3 on the right.
-      They are bit-identical until the campaign lands; everything that differs after that is the ad.
+      2つの世界は同じシードから作られているので、左の agent 3 と右の agent 3 は同一人物です。
+      広告が着弾するまで両者はログレベルで同一で、それ以降の差はすべて広告に起因します。
     </div>
   </div>
 </header>
@@ -102,6 +102,9 @@
     <input type="range" id="scrub" min="0" max="0" value="0">
     <span class="step" id="stepLabel">step 0</span>
     <select id="treatedPick"></select>
+    <label style="font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px">
+      <input type="checkbox" id="live"> 実行中を追う
+    </label>
   </div>
 
   <div id="error" class="err" hidden></div>
@@ -150,11 +153,30 @@
 
 <script>
 const BRAND = "brandco", RIVAL = "rival";
-const HALF = 10;                 // half_space_size in the scenario files
-const PLACES = [
-  { name: BRAND, cx: -7, cy: 0, half: 3, color: "#2a9d8f" },
-  { name: RIVAL, cx:  7, cy: 0, half: 3, color: "#6d8ec9" },
+const PLACE_COLORS = ["#2a9d8f", "#6d8ec9", "#e9c46a", "#b07fd0"];
+
+// Filled from demo/runs.json. Hard-coding the field size and the shop
+// positions meant the page silently drew a world the runs no longer used
+// every time the scenario was retuned, so the geometry now travels with
+// the data. These values are only the fallback for a manifest-less repo.
+let HALF = 9;
+let PLACES = [
+  { name: BRAND, cx: -5, cy: 0, half: 2, color: PLACE_COLORS[0] },
+  { name: RIVAL, cx:  5, cy: 0, half: 2, color: PLACE_COLORS[1] },
 ];
+
+function applyWorld(world) {
+  if (!world || !world.places || !world.places.length) return;
+  if (world.num_agents) {
+    document.getElementById("title").textContent =
+      `GhostLift — 同じ${world.num_agents}人を、広告のある世界とない世界で走らせる`;
+  }
+  HALF = world.half_space_size ?? HALF;
+  PLACES = world.places.map((p, i) => ({
+    name: p.name, cx: p.center_x, cy: p.center_y, half: p.half_size,
+    color: PLACE_COLORS[i % PLACE_COLORS.length],
+  }));
+}
 
 const state = { A: null, B: null, msgA: [], msgB: [], step: 0, timer: null, pairs: [] };
 
@@ -172,8 +194,10 @@ const FALLBACK_PAIRS = [
 ];
 
 const SCENARIO_LABEL = {
-  broadcast: "B: broadcast（全員配信）",
-  retarget: "C: retarget（店に近い人だけ）",
+  discount_broad:  "値引き訴求 × 全員配信",
+  discount_target: "値引き訴求 × 買う気の人だけ",
+  quality_broad:   "品質訴求 × 全員配信",
+  quality_target:  "品質訴求 × 買う気の人だけ",
 };
 
 async function loadManifest() {
@@ -181,6 +205,7 @@ async function loadManifest() {
     const res = await fetch("runs.json", { cache: "no-store" });
     if (!res.ok) throw new Error("no manifest");
     const data = await res.json();
+    applyWorld(data.world);
     if (data.pairs && data.pairs.length) return data.pairs;
   } catch (e) { /* fall through to the default pair names */ }
   return FALLBACK_PAIRS;
@@ -399,6 +424,23 @@ function togglePlay() {
   }, 700);
 }
 
+// While a run is still being written, metrics.jsonl grows step by step, so the
+// same page can be used to watch a simulation in progress rather than only to
+// replay a finished one.
+let liveTimer = null;
+document.getElementById("live").addEventListener("change", e => {
+  if (liveTimer) { clearInterval(liveTimer); liveTimer = null; }
+  if (!e.target.checked) return;
+  liveTimer = setInterval(async () => {
+    const pair = state.pairs[+document.getElementById("treatedPick").value];
+    const atEnd = state.step >= Math.min(state.A.length, state.B.length) - 1;
+    try {
+      await loadWorlds(pair);
+      if (atEnd) setStep(Math.min(state.A.length, state.B.length) - 1);
+    } catch (err) { /* a half-written line is normal mid-run; try again */ }
+  }, 5000);
+});
+
 function showError(err) {
   const el = document.getElementById("error");
   el.hidden = false;
@@ -406,8 +448,16 @@ function showError(err) {
     + ` http://localhost:8124/demo/dashboard.html を開いてください。`;
 }
 
+function applyHash() {
+  const m = /step=(last|\d+)/.exec(location.hash);
+  if (!m) return;
+  const max = Math.min(state.A.length, state.B.length) - 1;
+  setStep(m[1] === "last" ? max : Math.min(+m[1] - 1, max));
+}
+
 loadManifest()
   .then(pairs => { fillSelector(pairs); return loadWorlds(pairs[0]); })
+  .then(applyHash)
   .catch(showError);
 </script>
 </body>

@@ -1,38 +1,87 @@
 {
+  "world": {
+    "half_space_size": 9,
+    "duration": 24,
+    "num_agents": 12,
+    "places": [
+      {
+        "name": "brandco",
+        "center_x": -5,
+        "center_y": 0,
+        "half_size": 2,
+        "stock": 4,
+        "price": 5
+      },
+      {
+        "name": "rival",
+        "center_x": 5,
+        "center_y": 0,
+        "half_size": 2,
+        "stock": 5,
+        "price": 4
+      }
+    ]
+  },
   "runs": [
     {
-      "dir": "output_broadcast",
-      "scenario": "broadcast",
-      "seed": null,
-      "steps": 1
+      "dir": "output_discount_broad_s44",
+      "scenario": "discount_broad",
+      "seed": 44,
+      "steps": 24
     },
     {
-      "dir": "output_noad",
+      "dir": "output_discount_target_s44",
+      "scenario": "discount_target",
+      "seed": 44,
+      "steps": 24
+    },
+    {
+      "dir": "output_noad_s44",
       "scenario": "noad",
-      "seed": null,
-      "steps": 1
+      "seed": 44,
+      "steps": 24
     },
     {
-      "dir": "output_retarget",
-      "scenario": "retarget",
-      "seed": null,
-      "steps": 1
+      "dir": "output_quality_broad_s44",
+      "scenario": "quality_broad",
+      "seed": 44,
+      "steps": 24
+    },
+    {
+      "dir": "output_quality_target_s44",
+      "scenario": "quality_target",
+      "seed": 44,
+      "steps": 24
     }
   ],
   "pairs": [
     {
-      "control": "output_noad",
-      "treated": "output_broadcast",
-      "scenario": "broadcast",
-      "seed": null,
-      "steps": 1
+      "control": "output_noad_s44",
+      "treated": "output_discount_broad_s44",
+      "scenario": "discount_broad",
+      "seed": 44,
+      "steps": 24
     },
     {
-      "control": "output_noad",
-      "treated": "output_retarget",
-      "scenario": "retarget",
-      "seed": null,
-      "steps": 1
+      "control": "output_noad_s44",
+      "treated": "output_discount_target_s44",
+      "scenario": "discount_target",
+      "seed": 44,
+      "steps": 24
+    },
+    {
+      "control": "output_noad_s44",
+      "treated": "output_quality_broad_s44",
+      "scenario": "quality_broad",
+      "seed": 44,
+      "steps": 24
+    },
+    {
+      "control": "output_noad_s44",
+      "treated": "output_quality_target_s44",
+      "scenario": "quality_target",
+      "seed": 44,
+      "steps": 24
     }
   ]
 }
