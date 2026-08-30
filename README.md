@@ -5,6 +5,15 @@
 
 ![二画面リプレイ](demo/dashboard.png)
 
+## 構成
+
+[![アーキテクチャ図](docs/ghostlift-architecture.visual-check.1440x900.light.png)](docs/ghostlift-architecture.html)
+
+同一シードから2つの世界を生成し、**広告前のログが同一であることを検証できた実行だけ**を分解に進めます。
+検証を通らなかった実行は数字を出さずに破棄します。
+図は [docs/ghostlift-architecture.html](docs/ghostlift-architecture.html)（単一HTML・ダーク/ライト・PNG/SVG書き出し可）。
+[Archify](https://github.com/tt-a1i/archify) で生成しました。
+
 ## これは何？
 
 8人のAI消費者（1人ずつが本物のLLM）が2Dの街に住み、口コミを交わしながら自由に動き、

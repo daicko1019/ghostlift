@@ -1,0 +1,251 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "GhostLift — 広告の増分を反実仮想ペアで測る構成",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1340,
+      810
+    ],
+    "views": [
+      {
+        "id": "twin-runs",
+        "label": "双子ランの生成",
+        "focus": [
+          "runner",
+          "worldControl",
+          "worldTreated",
+          "ollama"
+        ],
+        "note": "同一シードから同じ12人を2つの世界で走らせる。設定ファイルの差は ad_campaigns ブロックだけ。"
+      },
+      {
+        "id": "verification-gate",
+        "label": "検証ゲート",
+        "focus": [
+          "logsControl",
+          "logsTreated",
+          "verify",
+          "discarded"
+        ],
+        "note": "広告が届く前のログが同一でない実行は、数字を出さずに破棄する。16ペア中4ペアだけが通った。"
+      },
+      {
+        "id": "decomposition",
+        "label": "分解と観測",
+        "focus": [
+          "verify",
+          "decompose",
+          "dashboard"
+        ],
+        "note": "個人単位で突き合わせ、報告されるCVを NEW / STOLEN / GHOST / LOST に分ける。"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "runner",
+      "type": "backend",
+      "label": "実行オーケストレータ",
+      "sublabel": "scripts/run_all.py",
+      "tag": "5シナリオ × 3シード",
+      "pos": [
+        40,
+        390
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "worldControl",
+      "type": "backend",
+      "label": "広告なしの世界",
+      "sublabel": "反実仮想の基準",
+      "pos": [
+        310,
+        110
+      ],
+      "size": [
+        180,
+        76
+      ]
+    },
+    {
+      "id": "ollama",
+      "type": "cloud",
+      "label": "Ollama 推論ノード",
+      "sublabel": "qwen3:4b · GPU 3台",
+      "tag": "シード単位でノード固定",
+      "pos": [
+        310,
+        390
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "worldTreated",
+      "type": "backend",
+      "label": "広告のある世界",
+      "sublabel": "click · search · mute",
+      "pos": [
+        310,
+        670
+      ],
+      "size": [
+        180,
+        76
+      ]
+    },
+    {
+      "id": "logsControl",
+      "type": "database",
+      "label": "対照ランのログ",
+      "sublabel": "metrics · messages",
+      "pos": [
+        580,
+        110
+      ],
+      "size": [
+        175,
+        76
+      ]
+    },
+    {
+      "id": "logsTreated",
+      "type": "database",
+      "label": "施策ランのログ",
+      "sublabel": "metrics · messages",
+      "pos": [
+        580,
+        670
+      ],
+      "size": [
+        175,
+        76
+      ]
+    },
+    {
+      "id": "verify",
+      "type": "security",
+      "label": "双子検証ゲート",
+      "sublabel": "scripts/verify_twins.py",
+      "tag": "広告前が同一か",
+      "pos": [
+        845,
+        390
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "discarded",
+      "type": "external",
+      "label": "破棄",
+      "sublabel": "数字を出さない",
+      "pos": [
+        850,
+        670
+      ],
+      "size": [
+        170,
+        70
+      ]
+    },
+    {
+      "id": "decompose",
+      "type": "backend",
+      "label": "増分の分解",
+      "sublabel": "scripts/ghost_analysis.py",
+      "tag": "NEW / STOLEN / GHOST / LOST",
+      "pos": [
+        1110,
+        250
+      ],
+      "size": [
+        190,
+        78
+      ]
+    },
+    {
+      "id": "dashboard",
+      "type": "frontend",
+      "label": "二画面ダッシュボード",
+      "sublabel": "demo/dashboard.html",
+      "pos": [
+        1110,
+        530
+      ],
+      "size": [
+        190,
+        78
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "runner",
+      "to": "worldControl",
+      "label": "対照ラン"
+    },
+    {
+      "from": "runner",
+      "to": "worldTreated",
+      "label": "施策ラン"
+    },
+    {
+      "from": "worldControl",
+      "to": "ollama",
+      "label": "推論",
+      "labelDy": 95
+    },
+    {
+      "from": "worldTreated",
+      "to": "ollama",
+      "label": "同じノードへ"
+    },
+    {
+      "from": "worldControl",
+      "to": "logsControl"
+    },
+    {
+      "from": "worldTreated",
+      "to": "logsTreated"
+    },
+    {
+      "from": "logsControl",
+      "to": "verify",
+      "label": "広告前を突き合わせ"
+    },
+    {
+      "from": "logsTreated",
+      "to": "verify"
+    },
+    {
+      "from": "verify",
+      "to": "discarded",
+      "label": "乖離したら破棄",
+      "variant": "dashed",
+      "labelDy": 95
+    },
+    {
+      "from": "verify",
+      "to": "decompose",
+      "label": "同一なら通す",
+      "variant": "emphasis"
+    },
+    {
+      "from": "decompose",
+      "to": "dashboard",
+      "label": "個人単位の4分類",
+      "labelDy": 95
+    }
+  ]
+}
